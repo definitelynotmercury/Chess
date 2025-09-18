@@ -3,8 +3,10 @@ package Main;
 import java.awt.AlphaComposite;
 import java.awt.Color;
 import java.awt.Dimension;
+import java.awt.Font;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
+import java.awt.RenderingHints;
 import java.util.ArrayList;
 
 import javax.swing.JPanel;
@@ -69,7 +71,19 @@ public class ChessPanel extends JPanel implements Runnable{
 		selectedPiece = null;
 	}
 	
-	
+	private void castle() {
+		// King-side castling: king moves to column 6, rook moves to column 5
+        if(selectedPiece.col == 6) {
+            castlePiece.col = 5;
+        } 
+        // Queen-side castling: king moves to column 2, rook moves to column 3
+        else if(selectedPiece.col == 2) {
+            castlePiece.col = 3;
+        }
+        castlePiece.posX = castlePiece.col * ChessBoard.TILE_SIZE;
+        castlePiece.isMoved = true;
+        castlePiece = null;
+	}
 	private void update() {
 	    if(controller.isPressed) {
 	        if(selectedPiece == null) {
@@ -104,17 +118,7 @@ public class ChessPanel extends JPanel implements Runnable{
 	                
 	                // Handle castling - move the rook after moving the king
 	                if(castlePiece != null) {
-	                    // King-side castling: king moves to column 6, rook moves to column 5
-	                    if(selectedPiece.col == 6) {
-	                        castlePiece.col = 5;
-	                    } 
-	                    // Queen-side castling: king moves to column 2, rook moves to column 3
-	                    else if(selectedPiece.col == 2) {
-	                        castlePiece.col = 3;
-	                    }
-	                    castlePiece.posX = castlePiece.col * ChessBoard.TILE_SIZE;
-	                    castlePiece.isMoved = true;
-	                    castlePiece = null;
+	                	castle();
 	                }
 	                
 	                selectedPiece = null;
@@ -294,6 +298,17 @@ public class ChessPanel extends JPanel implements Runnable{
 			for(Piece piece: simPiece) {
 				piece.draw(g2);
 			}
+		}
+		
+		//status messages
+		g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+		g2.setFont(new Font("Book Antiqua", Font.PLAIN,40));
+		g2.setColor(Color.white);
+		
+		if (currentColor == WHITE_SIDE) {
+		    g2.drawString("White's turn", 840, 550);
+		} else {
+		    g2.drawString("Black's turn", 840, 250);
 		}
 		
 	}
