@@ -18,7 +18,7 @@ public class Rook extends Piece{
 		
 		if(inBounds(targetColumn, targetRow) && isSameTile(targetColumn, targetRow) == false) {
 			if(targetColumn == preCol || targetRow == preRow) {
-				if(isValidTile(targetColumn, targetRow)) {
+				if(isValidTile(targetColumn, targetRow)&& isBlocked(targetColumn,targetRow)==false) {
 					return true;
 				}
 			}

@@ -114,6 +114,51 @@ public class Piece {
 		return false;
 	}
 	
+public boolean isBlocked(int targetColumn,int targetRow) {
+		
+		//checks every tile on the left of a single row.
+		for(int column = preCol-1; column > targetColumn; column--) {
+			for(Piece piece : ChessPanel.simPiece) {
+				if(piece.col == column && piece.row == targetRow) {
+					targetPiece = piece;
+					return true;
+				}
+			}
+		}
+		
+		//checks every tile on the right of a single row.
+		for(int column = preCol+1; column < targetColumn; column++) {
+			for(Piece piece : ChessPanel.simPiece) {
+				if(piece.col == column && piece.row == targetRow) {
+					targetPiece = piece;
+					return true;
+				}
+			}
+		}
+		
+		//checks every tile on the right of a single row.
+		for(int row = preRow+1; row < targetRow; row++) {
+			for(Piece piece : ChessPanel.simPiece) {
+				if(piece.col == targetColumn && piece.row == row) {
+					targetPiece = piece;
+					return true;
+				}
+			}
+		}
+		
+		for(int row = preRow-1; row > targetRow; row--) {
+			for(Piece piece : ChessPanel.simPiece) {
+				if(piece.col == targetColumn && piece.row == row) {
+					targetPiece = piece;
+					return true;
+				}
+			}
+		}
+		
+		
+		return false;
+	}
+	
 	
 	public BufferedImage getImage(String filePath) {
 	    BufferedImage image = null;
