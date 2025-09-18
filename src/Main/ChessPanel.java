@@ -3,8 +3,10 @@ package Main;
 import java.awt.AlphaComposite;
 import java.awt.Color;
 import java.awt.Dimension;
+import java.awt.Font;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
+import java.awt.RenderingHints;
 import java.util.ArrayList;
 
 import javax.swing.JPanel;
@@ -59,6 +61,15 @@ public class ChessPanel extends JPanel implements Runnable{
 		chessThread.start();
 	}
 	
+	private void passTurn() {
+		if(currentColor == WHITE_SIDE) {
+			currentColor = BLACK_SIDE;
+		}else {
+			currentColor = WHITE_SIDE;
+		}
+		selectedPiece = null;
+	}
+	
 	
 	private void update() {
 		if(controller.isPressed) {
@@ -92,6 +103,7 @@ public class ChessPanel extends JPanel implements Runnable{
 					dupePieces(simPiece,arrPiece);
 					selectedPiece.movePosition();
 					selectedPiece = null;
+					passTurn();
 					// Clear available moves when piece is deselected
 					availableMoves.clear();
 				}else {
@@ -261,6 +273,16 @@ public class ChessPanel extends JPanel implements Runnable{
 			piece.draw(g2);
 		}
 		
+		//status messages
+		g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+		g2.setFont(new Font("Book Antiqua", Font.PLAIN,40));
+		g2.setColor(Color.white);
+		
+		if (currentColor == WHITE_SIDE) {
+		    g2.drawString("White's turn", 840, 550);
+		} else {
+		    g2.drawString("Black's turn", 840, 250);
+		}
 	}
 
 	
