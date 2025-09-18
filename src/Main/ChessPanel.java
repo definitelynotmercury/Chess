@@ -3,10 +3,8 @@ package Main;
 import java.awt.AlphaComposite;
 import java.awt.Color;
 import java.awt.Dimension;
-import java.awt.Font;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
-import java.awt.RenderingHints;
 import java.util.ArrayList;
 
 import javax.swing.JPanel;
@@ -41,6 +39,7 @@ public class ChessPanel extends JPanel implements Runnable{
 	public static ArrayList<Piece> arrPiece = new ArrayList<Piece>();
 	public static ArrayList<Piece> simPiece = new ArrayList<Piece>();
 	Piece selectedPiece;
+	public static Piece castlePiece;
 	
 	// Available moves for selected piece
 	ArrayList<int[]> availableMoves = new ArrayList<int[]>();
@@ -72,49 +71,66 @@ public class ChessPanel extends JPanel implements Runnable{
 	
 	
 	private void update() {
-		if(controller.isPressed) {
-			if(selectedPiece == null) {
-				
-				//find the piece that the player wanted to select
-				//via loop and checking if the mouse matches column and row
-				for(Piece piece: simPiece) {
-					if(piece.color == currentColor && 
-					   piece.col == controller.posX/ChessBoard.TILE_SIZE && 
-					   piece.row == controller.posY/ChessBoard.TILE_SIZE) {
-						
-						selectedPiece = piece;
-						// Calculate available moves when piece is selected
-						calculateAvailableMoves();
-					}
-				}
-			} else {
-				simulate();
-			}
-		}
-		
-		if(!controller.isPressed) {
-			if(selectedPiece != null) {
-				if(validTile) {
-					//update the list of piece when theres a capture
-					 if(selectedPiece.targetPiece != null) {
-		                    simPiece.remove(selectedPiece.targetPiece.getTargetIndex());
-		                }
-					
-					dupePieces(simPiece,arrPiece);
-					selectedPiece.movePosition();
-					selectedPiece = null;
-					passTurn();
-					// Clear available moves when piece is deselected
-					availableMoves.clear();
-				}else {
-					dupePieces(arrPiece,simPiece);
-					selectedPiece.revert();
-					selectedPiece = null;
-					// Clear available moves when move is invalid
-					availableMoves.clear();
-				}
-			}
-		}
+	    if(controller.isPressed) {
+	        if(selectedPiece == null) {
+	            
+	            //find the piece that the player wanted to select
+	            //via loop and checking if the mouse matches column and row
+	            for(Piece piece: simPiece) {
+	                if(piece.color == currentColor && 
+	                   piece.col == controller.posX/ChessBoard.TILE_SIZE && 
+	                   piece.row == controller.posY/ChessBoard.TILE_SIZE) {
+	                    
+	                    selectedPiece = piece;
+	                    // Calculate available moves when piece is selected
+	                    calculateAvailableMoves();
+	                }
+	            }
+	        } else {
+	            simulate();
+	        }
+	    }
+	    
+	    if(!controller.isPressed) {
+	        if(selectedPiece != null) {
+	            if(validTile) {
+	                //update the list of piece when theres a capture
+	                if(selectedPiece.targetPiece != null) {
+	                    simPiece.remove(selectedPiece.targetPiece.getTargetIndex());
+	                }
+	                
+	                dupePieces(simPiece,arrPiece);
+	                selectedPiece.movePosition();
+	                
+	                // Handle castling - move the rook after moving the king
+	                if(castlePiece != null) {
+	                    // King-side castling: king moves to column 6, rook moves to column 5
+	                    if(selectedPiece.col == 6) {
+	                        castlePiece.col = 5;
+	                    } 
+	                    // Queen-side castling: king moves to column 2, rook moves to column 3
+	                    else if(selectedPiece.col == 2) {
+	                        castlePiece.col = 3;
+	                    }
+	                    castlePiece.posX = castlePiece.col * ChessBoard.TILE_SIZE;
+	                    castlePiece.isMoved = true;
+	                    castlePiece = null;
+	                }
+	                
+	                selectedPiece = null;
+	                // Clear available moves when piece is deselected
+	                passTurn();
+	                availableMoves.clear();
+	            } else {
+	                dupePieces(arrPiece,simPiece);
+	                selectedPiece.revert();
+	                selectedPiece = null;
+	                // Clear available moves when move is invalid
+	                availableMoves.clear();
+	                castlePiece = null; // Reset if invalid move
+	            }
+	        }
+	    }
 	}
 	
 	
@@ -190,11 +206,14 @@ public class ChessPanel extends JPanel implements Runnable{
 			int y = row * ChessBoard.TILE_SIZE;
 			
 			// Check if there's an enemy piece at this position (for capture moves)
+			// Create a copy to avoid ConcurrentModificationException
 			boolean isCapture = false;
-			for(Piece piece : simPiece) {
-				if(piece.col == col && piece.row == row && piece.color != selectedPiece.color) {
-					isCapture = true;
-					break;
+			synchronized(simPiece) {
+				for(Piece piece : new ArrayList<Piece>(simPiece)) {
+					if(piece.col == col && piece.row == row && piece.color != selectedPiece.color) {
+						isCapture = true;
+						break;
+					}
 				}
 			}
 			
@@ -225,31 +244,32 @@ public class ChessPanel extends JPanel implements Runnable{
 	//create pieces
 	//add an inverse for picking color later on
 	public void createPieces() {
-		 for (int col = 0; col < 8; col++) {
-		        arrPiece.add(new Pawn(WHITE_SIDE, col, 6)); // row 6 = pawns
-		    }
-		 arrPiece.add(new Rook(WHITE_SIDE, 0, 7));
-		 arrPiece.add(new Rook(WHITE_SIDE, 7, 7));
-		 arrPiece.add(new Knight(WHITE_SIDE, 1, 7));
-		 arrPiece.add(new Knight(WHITE_SIDE, 6, 7));
-		 arrPiece.add(new Bishop(WHITE_SIDE, 2, 7));
-		 arrPiece.add(new Bishop(WHITE_SIDE, 5, 7));
-		 arrPiece.add(new Queen(WHITE_SIDE, 3, 7));
-		 arrPiece.add(new King(WHITE_SIDE, 4, 7));
-		
-		for (int col = 0; col < 8; col++) {
+	    // White pieces
+	    for (int col = 0; col < 8; col++) {
+	        arrPiece.add(new Pawn(WHITE_SIDE, col, 6)); // row 6 = pawns
+	    }
+	    arrPiece.add(new Rook(WHITE_SIDE, 0, 7));
+	    arrPiece.add(new Knight(WHITE_SIDE, 1, 7));
+	    arrPiece.add(new Bishop(WHITE_SIDE, 2, 7));
+	    arrPiece.add(new Queen(WHITE_SIDE, 3, 7));
+	    arrPiece.add(new King(WHITE_SIDE, 4, 7));
+	    arrPiece.add(new Bishop(WHITE_SIDE, 5, 7));
+	    arrPiece.add(new Knight(WHITE_SIDE, 6, 7));
+	    arrPiece.add(new Rook(WHITE_SIDE, 7, 7));
+
+	    // Black pieces
+	    for (int col = 0; col < 8; col++) {
 	        arrPiece.add(new Pawn(BLACK_SIDE, col, 1)); // row 1 = pawns
 	    }
 	    arrPiece.add(new Rook(BLACK_SIDE, 0, 0));
-	    arrPiece.add(new Rook(BLACK_SIDE, 7, 0));
 	    arrPiece.add(new Knight(BLACK_SIDE, 1, 0));
-	    arrPiece.add(new Knight(BLACK_SIDE, 6, 0));
 	    arrPiece.add(new Bishop(BLACK_SIDE, 2, 0));
-	    arrPiece.add(new Bishop(BLACK_SIDE, 5, 0));
 	    arrPiece.add(new Queen(BLACK_SIDE, 3, 0));
 	    arrPiece.add(new King(BLACK_SIDE, 4, 0));
-	}
-	
+	    arrPiece.add(new Bishop(BLACK_SIDE, 5, 0));
+	    arrPiece.add(new Knight(BLACK_SIDE, 6, 0));
+	    arrPiece.add(new Rook(BLACK_SIDE, 7, 0));
+	}	
 	private void dupePieces(ArrayList<Piece> source,ArrayList<Piece> target) {
 		
 		target.clear();
@@ -269,20 +289,13 @@ public class ChessPanel extends JPanel implements Runnable{
 		// Draw available moves before drawing pieces
 		drawAvailableMoves(g2);
 		
-		for(Piece piece: simPiece) {
-			piece.draw(g2);
+		// Use synchronized block to prevent ConcurrentModificationException
+		synchronized(simPiece) {
+			for(Piece piece: simPiece) {
+				piece.draw(g2);
+			}
 		}
 		
-		//status messages
-		g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
-		g2.setFont(new Font("Book Antiqua", Font.PLAIN,40));
-		g2.setColor(Color.white);
-		
-		if (currentColor == WHITE_SIDE) {
-		    g2.drawString("White's turn", 840, 550);
-		} else {
-		    g2.drawString("Black's turn", 840, 250);
-		}
 	}
 
 	
