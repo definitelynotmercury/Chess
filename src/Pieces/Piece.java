@@ -114,7 +114,7 @@ public class Piece {
 		return false;
 	}
 	
-public boolean isBlocked(int targetColumn,int targetRow) {
+	public boolean isBlockedStraight(int targetColumn,int targetRow) {
 		
 		//checks every tile on the left of a single row.
 		for(int column = preCol-1; column > targetColumn; column--) {
@@ -159,6 +159,62 @@ public boolean isBlocked(int targetColumn,int targetRow) {
 		return false;
 	}
 	
+	public boolean isBlockDiagonal(int targetColumn,int targetRow) {
+		
+		if(targetRow < preRow) {
+			// up left
+			for(int column = preCol - 1; column > targetColumn; column--) {
+				int difference = Math.abs(column - preCol);
+				for(Piece piece : ChessPanel.simPiece) {
+					if(piece.col == column && piece.row == preRow - difference ) {
+						targetPiece = piece;
+						return true;
+					}
+				}
+			}
+			
+			
+			//up right
+			for(int column = preCol + 1; column < targetColumn; column++) {
+				int difference = Math.abs(column - preCol);
+				for(Piece piece : ChessPanel.simPiece) {
+					if(piece.col == column && piece.row == preRow - difference ) {
+						targetPiece = piece;
+						return true;
+					}
+				}
+			}
+			
+		}
+		
+		if(targetRow > preRow) {
+			
+			// down left
+			for(int column = preCol - 1; column > targetColumn; column--) {
+				int difference = Math.abs(column - preCol);
+				for(Piece piece : ChessPanel.simPiece) {
+					if(piece.col == column && piece.row == preRow + difference ) {
+						targetPiece = piece;
+						return true;
+					}
+				}
+			}
+			
+			//down right
+			
+			for(int column = preCol + 1; column < targetColumn; column++) {
+				int difference = Math.abs(column - preCol);
+				for(Piece piece : ChessPanel.simPiece) {
+					if(piece.col == column && piece.row == preRow + difference ) {
+						targetPiece = piece;
+						return true;
+					}
+				}
+			}
+			
+		}
+		return false;
+	}
 	
 	public BufferedImage getImage(String filePath) {
 	    BufferedImage image = null;

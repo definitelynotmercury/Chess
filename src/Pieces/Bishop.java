@@ -13,4 +13,16 @@ public class Bishop extends Piece {
 			image = getImage("/piece/bishop1");
 		}
 	}
+	
+public boolean moveable(int targetColumn, int targetRow) {
+		
+		if(inBounds(targetColumn, targetRow) && isSameTile(targetColumn, targetRow) == false) {
+			if(Math.abs(targetColumn - preCol) == Math.abs(targetRow-preRow)) {
+				if(isValidTile(targetColumn, targetRow)&& isBlockDiagonal(targetColumn,targetRow)==false) {
+					return true;
+				}
+			}
+		}
+		return false;
+	}
 }
