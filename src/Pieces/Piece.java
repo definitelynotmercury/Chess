@@ -16,7 +16,7 @@ public class Piece {
 	public int col,row, preCol, preRow;
 	public int color;
 	public Piece targetPiece;
-	
+	public boolean isMoved;
 	public Piece(int color, int col, int row) {
 		
 		this.color = color;
@@ -56,6 +56,7 @@ public class Piece {
 	}
 	
 	public void movePosition() {
+		isMoved = true;
 		posX = getXpos(col);
 		posY = getYpos(row);
 		preCol = getColumn(posX);

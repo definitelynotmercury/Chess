@@ -222,7 +222,7 @@ public class ChessPanel extends JPanel implements Runnable{
 		 arrPiece.add(new Knight(WHITE_SIDE, 6, 7));
 		 arrPiece.add(new Bishop(WHITE_SIDE, 2, 7));
 		 arrPiece.add(new Bishop(WHITE_SIDE, 5, 7));
-		 arrPiece.add(new Queen(WHITE_SIDE, 3, 4));
+		 arrPiece.add(new Queen(WHITE_SIDE, 3, 7));
 		 arrPiece.add(new King(WHITE_SIDE, 4, 7));
 		
 		for (int col = 0; col < 8; col++) {
