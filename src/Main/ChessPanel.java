@@ -65,8 +65,25 @@ public class ChessPanel extends JPanel implements Runnable{
 	private void passTurn() {
 		if(currentColor == WHITE_SIDE) {
 			currentColor = BLACK_SIDE;
+			
+			synchronized(simPiece) {
+				for(Piece piece: simPiece) {
+					if(piece.color == BLACK_SIDE) {
+						piece.twoTileMove = false;
+					}
+				}
+			}
+			
 		}else {
 			currentColor = WHITE_SIDE;
+			
+			synchronized(simPiece) {
+				for(Piece piece: simPiece) {
+					if(piece.color == WHITE_SIDE) {
+						piece.twoTileMove = false;
+					}
+				}
+			}
 		}
 		selectedPiece = null;
 	}
@@ -84,20 +101,23 @@ public class ChessPanel extends JPanel implements Runnable{
         castlePiece.isMoved = true;
         castlePiece = null;
 	}
+	
 	private void update() {
 	    if(controller.isPressed) {
 	        if(selectedPiece == null) {
 	            
 	            //find the piece that the player wanted to select
 	            //via loop and checking if the mouse matches column and row
-	            for(Piece piece: simPiece) {
-	                if(piece.color == currentColor && 
-	                   piece.col == controller.posX/ChessBoard.TILE_SIZE && 
-	                   piece.row == controller.posY/ChessBoard.TILE_SIZE) {
-	                    
-	                    selectedPiece = piece;
-	                    // Calculate available moves when piece is selected
-	                    calculateAvailableMoves();
+	        	synchronized(simPiece) {
+	                for(Piece piece: simPiece) {
+	                    if(piece.color == currentColor && 
+	                       piece.col == controller.posX/ChessBoard.TILE_SIZE && 
+	                       piece.row == controller.posY/ChessBoard.TILE_SIZE) {
+	                        
+	                        selectedPiece = piece;
+	                        // Calculate available moves when piece is selected
+	                        calculateAvailableMoves();
+	                    }
 	                }
 	            }
 	        } else {
@@ -122,7 +142,7 @@ public class ChessPanel extends JPanel implements Runnable{
 	                }
 	                
 	                selectedPiece = null;
-	                // Clear available moves when piece is deselected
+	                // Clear available moves when piece is deselected	
 	                passTurn();
 	                availableMoves.clear();
 	            } else {
@@ -162,32 +182,34 @@ public class ChessPanel extends JPanel implements Runnable{
 	
 	// Calculate all available moves for the selected piece
 	private void calculateAvailableMoves() {
-		availableMoves.clear();
-		
-		if(selectedPiece == null) {
-			return;
-		}
-		
-		// Check all tiles on the board
-		for(int col = 0; col < 8; col++) {
-			for(int row = 0; row < 8; row++) {
-				// Temporarily set piece position for testing
-				int originalCol = selectedPiece.col;
-				int originalRow = selectedPiece.row;
-				
-				selectedPiece.col = col;
-				selectedPiece.row = row;
-				
-				// Check if the piece can move to this position
-				if(selectedPiece.moveable(col, row)) {
-					availableMoves.add(new int[]{col, row});
-				}
-				
-				// Restore original position
-				selectedPiece.col = originalCol;
-				selectedPiece.row = originalRow;
-			}
-		}
+	    synchronized(simPiece) {  // Add this
+	        availableMoves.clear();
+	        
+	        if(selectedPiece == null) {
+	            return;
+	        }
+	        
+	        // Check all tiles on the board
+	        for(int col = 0; col < 8; col++) {
+	            for(int row = 0; row < 8; row++) {
+	                // Temporarily set piece position for testing
+	                int originalCol = selectedPiece.col;
+	                int originalRow = selectedPiece.row;
+	                
+	                selectedPiece.col = col;
+	                selectedPiece.row = row;
+	                
+	                // Check if the piece can move to this position
+	                if(selectedPiece.moveable(col, row)) {
+	                    availableMoves.add(new int[]{col, row});
+	                }
+	                
+	                // Restore original position
+	                selectedPiece.col = originalCol;
+	                selectedPiece.row = originalRow;
+	            }
+	        }
+	    }
 	}
 	
 	// Draw available move indicators
@@ -274,12 +296,16 @@ public class ChessPanel extends JPanel implements Runnable{
 	    arrPiece.add(new Knight(BLACK_SIDE, 6, 0));
 	    arrPiece.add(new Rook(BLACK_SIDE, 7, 0));
 	}	
+	
 	private void dupePieces(ArrayList<Piece> source,ArrayList<Piece> target) {
-		
-		target.clear();
-		for(int i = 0; i < source.size(); i++) {
-			target.add(source.get(i));
-		}
+	    synchronized(source) {  // Synchronize on the source list
+	        synchronized(target) {  // Synchronize on the target list
+	            target.clear();
+	            for(int i = 0; i < source.size(); i++) {
+	                target.add(source.get(i));
+	            }
+	        }
+	    }
 	}
 	
 	//used to draw

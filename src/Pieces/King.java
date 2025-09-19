@@ -1,12 +1,14 @@
 package Pieces;
 
 import Main.ChessPanel;
+import Main.Type;
 
 public class King extends Piece{
 	
 	public King(int color, int column, int row) {
 		super(color,column,row);
 		
+		type = Type.KING;
 		if(color == ChessPanel.WHITE_SIDE) {
 			image = getImage("/piece/king");
 		}else if(color == ChessPanel.BLACK_SIDE) {

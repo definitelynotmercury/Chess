@@ -8,15 +8,17 @@ import javax.imageio.ImageIO;
 
 import Main.ChessBoard;
 import Main.ChessPanel;
+import Main.Type;
 
 public class Piece {
 	
+	public Type type;
 	public BufferedImage image;
 	public int posX, posY;
 	public int col,row, preCol, preRow;
 	public int color;
 	public Piece targetPiece;
-	public boolean isMoved;
+	public boolean isMoved, twoTileMove;
 	public Piece(int color, int col, int row) {
 		
 		this.color = color;
@@ -58,6 +60,13 @@ public class Piece {
 	}
 	
 	public void movePosition() {
+		
+		if(type == Type.PAWN) {
+			if(Math.abs(row - preRow) == 2) {
+				twoTileMove = true;
+			}
+		}
+		
 		isMoved = true;
 		posX = getXpos(col);
 		posY = getYpos(row);

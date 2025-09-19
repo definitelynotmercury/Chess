@@ -1,11 +1,14 @@
 package Pieces;
 
 import Main.ChessPanel;
+import Main.Type;
 
 public class Rook extends Piece{
 	
 	public Rook(int color, int column, int row) {
 		super(color,column,row);
+		
+		type = Type.ROOK;
 		
 		if(color == ChessPanel.WHITE_SIDE) {
 			image = getImage("/piece/rook");
