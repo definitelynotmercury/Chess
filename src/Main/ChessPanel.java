@@ -103,15 +103,21 @@ public class ChessPanel extends JPanel implements Runnable{
 	    else if(selectedPiece.col == 2) {
 	        castlePiece.col = 3;
 	    }
+	    //moves the rook to the new position
 	    castlePiece.movePosition();
 	    
 	    castlePiece = null;
 	}
 	
+	//handles the checking if a promotion is aviable
 	private boolean canPromote() {
 		
+		//checks if its a pawn
 		if(selectedPiece.type == Type.PAWN) {
+			//checks if the pawn is in row 0 to promote or black pawn in row 7 to promote
 			if(currentColor == WHITE_SIDE && selectedPiece.row == 0 || currentColor == BLACK_SIDE &&selectedPiece.row == 7) {
+				//clears the array of options
+				//and readds them
 				promotionPiece.clear();
 				promotionPiece.add(new Rook(currentColor,9,2));
 				promotionPiece.add(new Knight(currentColor,9,3));
@@ -123,7 +129,9 @@ public class ChessPanel extends JPanel implements Runnable{
 		return false;
 	}
 	
+	//handles the actual promotio logic
 	private void promotion() {
+		
 		if(controller.isPressed) {
 			synchronized(promotionPiece) {
 				for(Piece piece: promotionPiece) {
