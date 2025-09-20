@@ -91,17 +91,17 @@ public class ChessPanel extends JPanel implements Runnable{
 	}
 	
 	private void castle() {
-		// King-side castling: king moves to column 6, rook moves to column 5
-        if(selectedPiece.col == 6) {
-            castlePiece.col = 5;
-        } 
-        // Queen-side castling: king moves to column 2, rook moves to column 3
-        else if(selectedPiece.col == 2) {
-            castlePiece.col = 3;
-        }
-        castlePiece.posX = castlePiece.col * ChessBoard.TILE_SIZE;
-        castlePiece.isMoved = true;
-        castlePiece = null;
+	    // King-side castling: king moves to column 6, rook moves to column 5
+	    if(selectedPiece.col == 6) {
+	        castlePiece.col = 5;
+	    } 
+	    // Queen-side castling: king moves to column 2, rook moves to column 3
+	    else if(selectedPiece.col == 2) {
+	        castlePiece.col = 3;
+	    }
+	    castlePiece.movePosition();
+	    
+	    castlePiece = null;
 	}
 	
 	private boolean canPromote() {
@@ -180,7 +180,6 @@ public class ChessPanel extends JPanel implements Runnable{
 		                    simPiece.remove(selectedPiece.targetPiece.getTargetIndex());
 		                }
 		                
-		                dupePieces(simPiece,arrPiece);
 		                selectedPiece.movePosition();
 		                
 		                //call promotion
@@ -191,6 +190,9 @@ public class ChessPanel extends JPanel implements Runnable{
 		                if(castlePiece != null) {
 		                	castle();
 		                }
+		                
+		                // Update the permanent piece list AFTER castling is complete
+		                dupePieces(simPiece, arrPiece);
 		              
 		                
 		                if(canPromote()) {
