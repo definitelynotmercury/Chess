@@ -37,6 +37,7 @@ public class ChessPanel extends JPanel implements Runnable{
 	boolean canMove;
 	boolean validTile;
 	boolean promote;
+	boolean isIllegalMove;
 	
 	//pieces
 	public static ArrayList<Piece> arrPiece = new ArrayList<Piece>();
@@ -64,10 +65,12 @@ public class ChessPanel extends JPanel implements Runnable{
 		chessThread.start();
 	}
 	
+	//handles the turns
 	private void passTurn() {
 		if(currentColor == WHITE_SIDE) {
 			currentColor = BLACK_SIDE;
 			
+			//loops through the list and removes  enpassant option if not taken in the last turn
 			synchronized(simPiece) {
 				for(Piece piece: simPiece) {
 					if(piece.color == BLACK_SIDE) {
@@ -79,6 +82,7 @@ public class ChessPanel extends JPanel implements Runnable{
 		}else {
 			currentColor = WHITE_SIDE;
 			
+			//loops through the list and removes  enpassant option if not taken in the last turn
 			synchronized(simPiece) {
 				for(Piece piece: simPiece) {
 					if(piece.color == WHITE_SIDE) {
@@ -143,6 +147,43 @@ public class ChessPanel extends JPanel implements Runnable{
 				}
 			}
 		}
+	}
+	
+	public boolean illegalMoveByKing(Piece king, int targetColumn, int targetRow) {
+	    
+	    if(king.type == Type.KING) {
+	        // Store original position
+	        int originalColumn = king.col;
+	        int originalRow = king.row;
+	        
+	        // STEP 1: Move king to target position temporarily
+	        king.col = targetColumn;
+	        king.row = targetRow;
+	        
+	        synchronized(simPiece) {
+	            for(Piece piece: simPiece) {
+	                // STEP 2: Check if any enemy piece can attack the target position
+	                if(piece != king && piece.color != king.color && piece.moveable(targetColumn, targetRow)) {
+	                    king.col = originalColumn;
+	                    king.row = originalRow;
+	                    return true; // This move would be illegal
+	                }
+	            }
+	        }
+	        
+	        // STEP 4: Restore original position
+	        king.col = originalColumn;
+	        king.row = originalRow;
+	    }
+	    return false;
+	}
+	
+	private void isLegalMove(Piece piece, int targetColumn, int targetRow ) {
+		int originalCol = piece.col;
+	    int originalRow = piece.row;
+	    Piece capturedPiece = null;
+	    
+	    
 	}
 	
 	private void update() {
@@ -232,7 +273,14 @@ public class ChessPanel extends JPanel implements Runnable{
 		
 		if(selectedPiece.moveable(selectedPiece.col, selectedPiece.row)) {
 			canMove = true;
-			validTile = true;
+			
+			if(selectedPiece.type == Type.KING) {
+	            if(!illegalMoveByKing(selectedPiece, selectedPiece.col, selectedPiece.row)) {
+	                validTile = true;
+	            }
+	        } else {
+	            validTile = true; 
+	        }
 			
 		}
 		
@@ -260,7 +308,16 @@ public class ChessPanel extends JPanel implements Runnable{
 	                
 	                // Check if the piece can move to this position
 	                if(selectedPiece.moveable(col, row)) {
-	                    availableMoves.add(new int[]{col, row});
+	                	boolean isLegalMove = true;
+	                	 if(selectedPiece.type == Type.KING) {
+	                         // For king moves, use the existing illegalMove method
+	                         if(illegalMoveByKing(selectedPiece, col, row)) {
+	                             isLegalMove = false;
+	                         }
+	                     }
+	                	  if(isLegalMove) {
+	                          availableMoves.add(new int[]{col, row});
+	                      }
 	                }
 	                
 	                // Restore original position
@@ -293,6 +350,7 @@ public class ChessPanel extends JPanel implements Runnable{
 			// Check if there's an enemy piece at this position (for capture moves)
 			// Create a copy to avoid ConcurrentModificationException
 			boolean isCapture = false;
+			
 			synchronized(simPiece) {
 				for(Piece piece : new ArrayList<Piece>(simPiece)) {
 					if(piece.col == col && piece.row == row && piece.color != selectedPiece.color) {
@@ -301,6 +359,7 @@ public class ChessPanel extends JPanel implements Runnable{
 					}
 				}
 			}
+			
 			
 			if(isCapture) {
 				// Draw red border for capture moves
@@ -315,7 +374,7 @@ public class ChessPanel extends JPanel implements Runnable{
 				int centerX = x + ChessBoard.TILE_SIZE / 2 - circleSize / 2;
 				int centerY = y + ChessBoard.TILE_SIZE / 2 - circleSize / 2;
 				g2.fillOval(centerX, centerY, circleSize, circleSize);
-				
+
 				// Add border
 				g2.setColor(Color.GREEN);
 				g2.drawOval(centerX, centerY, circleSize, circleSize);
