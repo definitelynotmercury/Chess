@@ -16,13 +16,12 @@ public class Knight extends Piece {
 	}
 	
 	public boolean moveable(int targetColumn, int targetRow) {
-		if(inBounds(targetColumn,targetRow)) {
+
 			if(Math.abs(targetColumn - preCol) * Math.abs(targetRow - preRow) ==2) {
 				if(isValidTile(targetColumn,targetRow)) {
 					return true;
 				}
 			}
-		}
 		return false;
 	}
 }

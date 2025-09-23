@@ -15,12 +15,12 @@ public class Piece {
 	public Type type;
 	public BufferedImage image;
 	public int posX, posY;
-	public int col,row, preCol, preRow;
+	public int col, row, preCol, preRow;
 	public int color;
 	public Piece targetPiece;
 	public boolean isMoved, twoTileMove;
+	
 	public Piece(int color, int col, int row) {
-		
 		this.color = color;
 		this.col = col;
 		this.row = row;
@@ -40,27 +40,23 @@ public class Piece {
 	
 	public int getColumn(int posX) {
 		return (posX + ChessBoard.HALF_TILE_SIZE)/ChessBoard.TILE_SIZE;
-		
 	}
 	
 	public int getRow(int posY) {
 		return (posY + ChessBoard.HALF_TILE_SIZE)/ChessBoard.TILE_SIZE;
-		
 	}
 	
+	// UPDATED: Now works with the single pieces list
 	public int getTargetIndex() {
-	    synchronized(ChessPanel.simPiece) {
-	        for(int i = 0; i < ChessPanel.simPiece.size(); i++) {
-	            if(ChessPanel.simPiece.get(i) == this) {
-	                return i;
-	            }
-	        }
-	    }
-	    return 0;
+		for(int i = 0; i < ChessPanel.pieces.size(); i++) {
+			if(ChessPanel.pieces.get(i) == this) {
+				return i;
+			}
+		}
+		return 0;
 	}
 	
 	public void movePosition() {
-		
 		if(type == Type.PAWN) {
 			if(Math.abs(row - preRow) == 2) {
 				twoTileMove = true;
@@ -70,8 +66,8 @@ public class Piece {
 		isMoved = true;
 		posX = getXpos(col);
 		posY = getYpos(row);
-		preCol = getColumn(posX);
-		preRow = getRow(posY);
+		preCol = col; // Update preCol to current col
+		preRow = row; // Update preRow to current row
 	}
 	
 	public void revert() {
@@ -79,179 +75,160 @@ public class Piece {
 		row = preRow;
 		posX = getXpos(col);
 		posY = getYpos(row);
-		
 	}
 	
 	public boolean moveable(int targetColumn, int targetRow) {
 		return false;
 	}
 	
-	public boolean inBounds(int targetColumn, int targetRow) {
-		
-		if(targetColumn >= 0 && targetColumn <= 7 && targetRow >= 0 && targetRow <= 7) {
-			return true;
+	
+	// UPDATED: Now works with the single pieces list (no more sync needed)
+	public Piece getTargetPiece(int targetColumn, int targetRow) {
+		for(Piece piece: ChessPanel.pieces) {
+			if(piece.col == targetColumn && piece.row == targetRow && piece != this) {
+				return piece;
+			}
 		}
-		return false;
+		return null;
 	}
 	
-	public Piece getTargetPiece(int targetColumn,int targetRow) {
-	    synchronized(ChessPanel.simPiece) {
-	        for(Piece piece: ChessPanel.simPiece) {
-	            if(piece.col == targetColumn && piece.row == targetRow && piece != this) {
-	                return piece;
-	            }
-	        }
-	    }
-	    return null;
-	}
-	
-	public boolean isValidTile(int targetColumn,int targetRow) {
-		
-		 targetPiece = getTargetPiece(targetColumn,targetRow);
+	public boolean isValidTile(int targetColumn, int targetRow) {
+		targetPiece = getTargetPiece(targetColumn, targetRow);
 		
 		if(targetPiece != null) {
 			if(targetPiece.color != this.color) {
 				return true;
-			}else {
+			} else {
 				targetPiece = null;
 			}
-		}else {
+		} else {
 			return true;
 		}
 		return false;
 	}
 	
-	public boolean isSameTile(int targetColumn,int targetRow) {
+	public boolean isSameTile(int targetColumn, int targetRow) {
 		if(targetColumn == preCol && targetRow == preRow) {
 			return true;
 		}
 		return false;
 	}
 	
-	public boolean isBlockedStraight(int targetColumn,int targetRow) {
-	    synchronized(ChessPanel.simPiece) {
-	        //checks every tile on the left of a single row.
-	        for(int column = preCol-1; column > targetColumn; column--) {
-	            for(Piece piece : ChessPanel.simPiece) {
-	                if(piece.col == column && piece.row == targetRow) {
-	                    targetPiece = piece;
-	                    return true;
-	                }
-	            }
-	        }
-	        
-	        //checks every tile on the right of a single row.
-	        for(int column = preCol+1; column < targetColumn; column++) {
-	            for(Piece piece : ChessPanel.simPiece) {
-	                if(piece.col == column && piece.row == targetRow) {
-	                    targetPiece = piece;
-	                    return true;
-	                }
-	            }
-	        }
-	        
-	        //checks every tile below on a single column.
-	        for(int row = preRow+1; row < targetRow; row++) {
-	            for(Piece piece : ChessPanel.simPiece) {
-	                if(piece.col == targetColumn && piece.row == row) {
-	                    targetPiece = piece;
-	                    return true;
-	                }
-	            }
-	        }
-	        
-	        //checks every tile above on a single column.
-	        for(int row = preRow-1; row > targetRow; row--) {
-	            for(Piece piece : ChessPanel.simPiece) {
-	                if(piece.col == targetColumn && piece.row == row) {
-	                    targetPiece = piece;
-	                    return true;
-	                }
-	            }
-	        }
-	    }
-	    
-	    return false;
+	// UPDATED: Simplified blocking checks (no more sync needed)
+	public boolean isBlockedStraight(int targetColumn, int targetRow) {
+		// Check every tile on the left of a single row
+		for(int column = preCol-1; column > targetColumn; column--) {
+			for(Piece piece : ChessPanel.pieces) {
+				if(piece.col == column && piece.row == targetRow) {
+					targetPiece = piece;
+					return true;
+				}
+			}
+		}
+		
+		// Check every tile on the right of a single row
+		for(int column = preCol+1; column < targetColumn; column++) {
+			for(Piece piece : ChessPanel.pieces) {
+				if(piece.col == column && piece.row == targetRow) {
+					targetPiece = piece;
+					return true;
+				}
+			}
+		}
+		
+		// Check every tile below on a single column
+		for(int row = preRow+1; row < targetRow; row++) {
+			for(Piece piece : ChessPanel.pieces) {
+				if(piece.col == targetColumn && piece.row == row) {
+					targetPiece = piece;
+					return true;
+				}
+			}
+		}
+		
+		// Check every tile above on a single column
+		for(int row = preRow-1; row > targetRow; row--) {
+			for(Piece piece : ChessPanel.pieces) {
+				if(piece.col == targetColumn && piece.row == row) {
+					targetPiece = piece;
+					return true;
+				}
+			}
+		}
+		
+		return false;
 	}
 	
-	public boolean isBlockDiagonal(int targetColumn,int targetRow) {
-	    synchronized(ChessPanel.simPiece) {
-	        if(targetRow < preRow) {
-	            // up left
-	            for(int column = preCol - 1; column > targetColumn; column--) {
-	                int difference = Math.abs(column - preCol);
-	                for(Piece piece : ChessPanel.simPiece) {
-	                    if(piece.col == column && piece.row == preRow - difference ) {
-	                        targetPiece = piece;
-	                        return true;
-	                    }
-	                }
-	            }
-	            
-	            //up right
-	            for(int column = preCol + 1; column < targetColumn; column++) {
-	                int difference = Math.abs(column - preCol);
-	                for(Piece piece : ChessPanel.simPiece) {
-	                    if(piece.col == column && piece.row == preRow - difference ) {
-	                        targetPiece = piece;
-	                        return true;
-	                    }
-	                }
-	            }
-	        }
-	        
-	        if(targetRow > preRow) {
-	            // down left
-	            for(int column = preCol - 1; column > targetColumn; column--) {
-	                int difference = Math.abs(column - preCol);
-	                for(Piece piece : ChessPanel.simPiece) {
-	                    if(piece.col == column && piece.row == preRow + difference ) {
-	                        targetPiece = piece;
-	                        return true;
-	                    }
-	                }
-	            }
-	            
-	            //down right
-	            for(int column = preCol + 1; column < targetColumn; column++) {
-	                int difference = Math.abs(column - preCol);
-	                for(Piece piece : ChessPanel.simPiece) {
-	                    if(piece.col == column && piece.row == preRow + difference ) {
-	                        targetPiece = piece;
-	                        return true;
-	                    }
-	                }
-	            }
-	        }
-	    }
-	    return false;
+	// UPDATED: Simplified diagonal blocking (no more sync needed)
+	public boolean isBlockDiagonal(int targetColumn, int targetRow) {
+		if(targetRow < preRow) {
+			// up left
+			for(int column = preCol - 1; column > targetColumn; column--) {
+				int difference = Math.abs(column - preCol);
+				for(Piece piece : ChessPanel.pieces) {
+					if(piece.col == column && piece.row == preRow - difference) {
+						targetPiece = piece;
+						return true;
+					}
+				}
+			}
+			
+			// up right
+			for(int column = preCol + 1; column < targetColumn; column++) {
+				int difference = Math.abs(column - preCol);
+				for(Piece piece : ChessPanel.pieces) {
+					if(piece.col == column && piece.row == preRow - difference) {
+						targetPiece = piece;
+						return true;
+					}
+				}
+			}
+		}
+		
+		if(targetRow > preRow) {
+			// down left
+			for(int column = preCol - 1; column > targetColumn; column--) {
+				int difference = Math.abs(column - preCol);
+				for(Piece piece : ChessPanel.pieces) {
+					if(piece.col == column && piece.row == preRow + difference) {
+						targetPiece = piece;
+						return true;
+					}
+				}
+			}
+			
+			// down right
+			for(int column = preCol + 1; column < targetColumn; column++) {
+				int difference = Math.abs(column - preCol);
+				for(Piece piece : ChessPanel.pieces) {
+					if(piece.col == column && piece.row == preRow + difference) {
+						targetPiece = piece;
+						return true;
+					}
+				}
+			}
+		}
+		
+		return false;
 	}
 	
 	public BufferedImage getImage(String filePath) {
-	    BufferedImage image = null;
+		BufferedImage image = null;
 
-	    try {
-	        // Debugging line to check resource path
-	        System.out.println("Looking for: " + filePath + ".png");
-	        System.out.println("Resolved URL: " + getClass().getResource(filePath + ".png"));
+		try {
+			image = ImageIO.read(getClass().getResourceAsStream(filePath + ".png"));
 
-	        image = ImageIO.read(getClass().getResourceAsStream(filePath + ".png"));
+			if (image == null) {
+				System.out.println("⚠️ Failed to load image: " + filePath + ".png");
+			}
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
 
-	        if (image == null) {
-	            System.out.println("⚠️ Failed to load image: " + filePath + ".png");
-	        }
-	    } catch (IOException e) {
-	        e.printStackTrace();
-	    }
-
-	    return image;
+		return image;
 	}
-
 	
 	public void draw(Graphics2D g2) {
 		g2.drawImage(image, posX, posY, ChessBoard.TILE_SIZE, ChessBoard.TILE_SIZE, null);
 	}
-
-	
-	
 }

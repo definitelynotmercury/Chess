@@ -1,35 +1,30 @@
 package Pieces;
-
 import Main.ChessPanel;
 import Main.Type;
 
-public class King extends Piece{
+public class King extends Piece {
 	
 	public King(int color, int column, int row) {
-		super(color,column,row);
+		super(color, column, row);
 		
 		type = Type.KING;
 		if(color == ChessPanel.WHITE_SIDE) {
 			image = getImage("/piece/king");
-		}else if(color == ChessPanel.BLACK_SIDE) {
+		} else if(color == ChessPanel.BLACK_SIDE) {
 			image = getImage("/piece/king1");
 		}
 	}
 	
-	
-	public boolean moveable(int targetColumn, int targetRow){
-
+	public boolean moveable(int targetColumn, int targetRow) {
         // Regular king movement (1 square in any direction)
-        if(inBounds(targetColumn,targetRow)) {
-            if(Math.abs(targetRow-preRow) + Math.abs(targetColumn - preCol) == 1 ||
-               Math.abs(targetRow-preRow) * Math.abs(targetColumn - preCol) == 1) {
-
-                if(isValidTile(targetColumn,targetRow)) {
+            if(Math.abs(targetRow - preRow) + Math.abs(targetColumn - preCol) == 1 ||
+               Math.abs(targetRow - preRow) * Math.abs(targetColumn - preCol) == 1) {
+                if(isValidTile(targetColumn, targetRow)) {
                     return true;
                 }
             }
-        }
-
+        
+        
         // Castling logic
         if(isMoved == false) {
             
@@ -38,7 +33,8 @@ public class King extends Piece{
                 // Check if path is clear and rook exists
                 if(isBlockedStraight(targetColumn, targetRow) == false) {
                     // Look for rook at king-side (column 7)
-                    for(Piece piece: ChessPanel.simPiece) {
+                    // FIXED: Now uses ChessPanel.pieces instead of simPiece
+                    for(Piece piece: ChessPanel.pieces) {  // CHANGED: from simPiece to pieces
                         if(piece.col == preCol + 3 && // Rook should be at column 7 (king at 4 + 3 = 7)
                            piece.row == preRow && 
                            piece.isMoved == false && 
@@ -51,13 +47,14 @@ public class King extends Piece{
                     }
                 }
             }
-
+            
             // Queen-side castling (long castle) - King moves 2 squares left  
             if(targetColumn == preCol - 2 && targetRow == preRow) {
                 // Check if path is clear
                 if(isBlockedStraight(targetColumn, targetRow) == false) {
                     // Look for rook at queen-side (column 0)
-                    for(Piece piece: ChessPanel.simPiece) {
+                    // FIXED: Now uses ChessPanel.pieces instead of simPiece
+                    for(Piece piece: ChessPanel.pieces) {  // CHANGED: from simPiece to pieces
                         if(piece.col == preCol - 4 && // Rook should be at column 0 (king at 4 - 4 = 0)
                            piece.row == preRow && 
                            piece.isMoved == false && 
@@ -71,7 +68,6 @@ public class King extends Piece{
                 }
             }
         }
-
         return false;
     }
 }

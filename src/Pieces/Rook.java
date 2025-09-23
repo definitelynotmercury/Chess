@@ -19,7 +19,7 @@ public class Rook extends Piece{
 	
 	public boolean moveable(int targetColumn, int targetRow) {
 		
-		if(inBounds(targetColumn, targetRow) && isSameTile(targetColumn, targetRow) == false) {
+		if(isSameTile(targetColumn, targetRow) == false) {
 			if(targetColumn == preCol || targetRow == preRow) {
 				if(isValidTile(targetColumn, targetRow)&& isBlockedStraight(targetColumn,targetRow)==false) {
 					return true;

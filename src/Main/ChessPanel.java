@@ -7,6 +7,8 @@ import java.awt.Font;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.util.ArrayList;
 
 import javax.swing.JPanel;
@@ -19,14 +21,12 @@ import Pieces.Piece;
 import Pieces.Queen;
 import Pieces.Rook;
 
-public class ChessPanel extends JPanel implements Runnable{
+public class ChessPanel extends JPanel {
 	
 	public static final int PANELWIDTH = 1100;
 	public static final int PANELHEIGHT = 800;
-	final int framePerSecond = 120;
-	Thread chessThread;
+	
 	ChessBoard chessBoard = new ChessBoard();
-	Controller controller = new Controller();
 	
 	//setting colors
 	public static final int WHITE_SIDE = 0;
@@ -34,16 +34,13 @@ public class ChessPanel extends JPanel implements Runnable{
 	int currentColor = WHITE_SIDE;
 	
 	//BOOLEANS
-	boolean canMove;
-	boolean validTile;
 	boolean promote;
-	boolean isIllegalMove;
+	boolean gameOver;
 	
-	//pieces
-	public static ArrayList<Piece> arrPiece = new ArrayList<Piece>();
-	public static ArrayList<Piece> simPiece = new ArrayList<Piece>();
+	//pieces - simplified to single list (no more arrPiece/simPiece confusion)
+	public static ArrayList<Piece> pieces = new ArrayList<Piece>();
 	ArrayList<Piece> promotionPiece = new ArrayList<Piece>();
-	Piece selectedPiece ;
+	Piece selectedPiece;
 	public static Piece castlePiece;
 	
 	// Available moves for selected piece
@@ -53,290 +50,427 @@ public class ChessPanel extends JPanel implements Runnable{
 	public ChessPanel() {
 		setPreferredSize(new Dimension(PANELWIDTH,PANELHEIGHT));
 		setBackground(Color.lightGray);
-		addMouseMotionListener(controller);
-		addMouseListener(controller);
+		setupMouseHandlers();
 		createPieces();
-		dupePieces(arrPiece,simPiece);
 	}
 	
-	//creates a thread for the gameclock
-	public void launchChess() {
-		chessThread = new Thread(this);
-		chessThread.start();
+	// NEW: Event-driven mouse handling
+	private void setupMouseHandlers() {
+		MouseAdapter mouseHandler = new MouseAdapter() {
+			@Override
+			public void mousePressed(MouseEvent e) {
+				handleMouseClick(e.getX(), e.getY());
+			}
+		};
+		
+		addMouseListener(mouseHandler);
 	}
 	
-	//handles the turns
+	// NEW: Main click handler
+	private void handleMouseClick(int mouseX, int mouseY) {
+		int clickedCol = mouseX / ChessBoard.TILE_SIZE;
+		int clickedRow = mouseY / ChessBoard.TILE_SIZE;
+		
+		if (promote) {
+			// During promotion, allow clicks in the promotion area (column 9)
+			handlePromotion(clickedCol, clickedRow);
+		} else {
+			// During regular play, only allow clicks within board bounds
+			if (clickedCol < 0 || clickedCol > 7 || clickedRow < 0 || clickedRow > 7) {
+				return;
+			}
+			handleRegularMove(clickedCol, clickedRow);
+		}
+		
+		repaint(); // Only repaint when something actually changes
+	}
+	
+	// NEW: Handle regular game moves
+	private void handleRegularMove(int clickedCol, int clickedRow) {
+		if (selectedPiece == null) {
+			// Try to select a piece
+			selectPiece(clickedCol, clickedRow);
+		} else {
+			// Try to move the selected piece
+			attemptMove(clickedCol, clickedRow);
+		}
+	}
+	
+	// NEW: Select a piece
+	private void selectPiece(int col, int row) {
+		for (Piece piece : pieces) {
+			if (piece.col == col && piece.row == row && piece.color == currentColor) {
+				selectedPiece = piece;
+				calculateAvailableMoves();
+				break;
+			}
+		}
+	}
+	
+	// NEW: Attempt to move selected piece
+	private void attemptMove(int targetCol, int targetRow) {
+		// Check if the move is valid using our piece's moveable method
+		if (selectedPiece.moveable(targetCol, targetRow)) {
+			// Check if this move would expose our king
+			if (!moveExposesKing(selectedPiece, targetCol, targetRow)) {
+				executeMove(targetCol, targetRow);
+			} else {
+				// Invalid move - deselect piece
+				deselectPiece();
+			}
+		} else {
+			// Invalid move - deselect piece
+			deselectPiece();
+		}
+	}
+	
+	// NEW: Execute a valid move
+	private void executeMove(int targetCol, int targetRow) {
+		// Handle captures (including en passant)
+		handleCaptures(targetCol, targetRow);
+		
+		// Move the piece
+		selectedPiece.col = targetCol;
+		selectedPiece.row = targetRow;
+		selectedPiece.movePosition();
+		
+		// Handle castling
+		if (castlePiece != null) {
+			castle();
+		}
+		
+		// Check for promotion
+		if (canPromote()) {
+			promote = true;
+			setupPromotionOptions();
+		} else {
+			finishMove();
+		}
+	}
+	
+	// NEW: Handle captures including en passant
+	private void handleCaptures(int targetCol, int targetRow) {
+		// Regular capture
+		Piece capturedPiece = getPieceAt(targetCol, targetRow);
+		if (capturedPiece != null && capturedPiece.color != selectedPiece.color) {
+			pieces.remove(capturedPiece);
+			return;
+		}
+		
+		// En passant capture
+		if (selectedPiece.type == Type.PAWN && Math.abs(targetCol - selectedPiece.col) == 1) {
+			Piece enPassantTarget = getPieceAt(targetCol, selectedPiece.row);
+			if (enPassantTarget != null && enPassantTarget.type == Type.PAWN && 
+				enPassantTarget.color != selectedPiece.color && enPassantTarget.twoTileMove) {
+				pieces.remove(enPassantTarget);
+			}
+		}
+	}
+	
+	// NEW: Get piece at specific location
+	private Piece getPieceAt(int col, int row) {
+		for (Piece piece : pieces) {
+			if (piece.col == col && piece.row == row) {
+				return piece;
+			}
+		}
+		return null;
+	}
+	
+	// NEW: Deselect piece
+	private void deselectPiece() {
+		selectedPiece = null;
+		availableMoves.clear();
+		castlePiece = null;
+	}
+	
+	// NEW: Finish move and pass turn
+	private void finishMove() {
+		deselectPiece();
+		passTurn();
+	}
+	
+	// NEW: Setup promotion options
+	private void setupPromotionOptions() {
+		promotionPiece.clear();
+		promotionPiece.add(new Rook(currentColor, 9, 2));
+		promotionPiece.add(new Knight(currentColor, 9, 3));
+		promotionPiece.add(new Bishop(currentColor, 9, 4));
+		promotionPiece.add(new Queen(currentColor, 9, 5));
+	}
+	
+	// NEW: Handle promotion selection
+	private void handlePromotion(int col, int row) {
+		// Debug: Print what was clicked
+		System.out.println("Promotion click at: " + col + ", " + row);
+		
+		for (Piece piece : promotionPiece) {
+			System.out.println("Checking piece at: " + piece.col + ", " + piece.row + " (type: " + piece.type + ")");
+			if (piece.col == col && piece.row == row) {
+				System.out.println("Promotion selected: " + piece.type);
+				
+				// Store the position where the pawn promoted
+				int promotionCol = selectedPiece.col;
+				int promotionRow = selectedPiece.row;
+				
+				// Remove the pawn
+				pieces.remove(selectedPiece);
+				
+				// Add the new piece at the promotion location
+				switch (piece.type) {
+					case ROOK: pieces.add(new Rook(currentColor, promotionCol, promotionRow)); break;
+					case KNIGHT: pieces.add(new Knight(currentColor, promotionCol, promotionRow)); break;
+					case BISHOP: pieces.add(new Bishop(currentColor, promotionCol, promotionRow)); break;
+					case QUEEN: pieces.add(new Queen(currentColor, promotionCol, promotionRow)); break;
+					default: break;
+				}
+				
+				promote = false;
+				finishMove();
+				return;
+			}
+		}
+		System.out.println("No promotion piece found at clicked location");
+	}
+	
+	// KEPT: handles the turns (simplified - no more sync issues)
 	private void passTurn() {
+		// Switch turns first
 		if(currentColor == WHITE_SIDE) {
 			currentColor = BLACK_SIDE;
 			
-			//loops through the list and removes  enpassant option if not taken in the last turn
-			synchronized(simPiece) {
-				for(Piece piece: simPiece) {
-					if(piece.color == BLACK_SIDE) {
-						piece.twoTileMove = false;
-					}
+			// Remove en passant option from black pieces
+			for(Piece piece: pieces) {
+				if(piece.color == BLACK_SIDE) {
+					piece.twoTileMove = false;
 				}
 			}
-			
-		}else {
+		} else {
 			currentColor = WHITE_SIDE;
 			
-			//loops through the list and removes  enpassant option if not taken in the last turn
-			synchronized(simPiece) {
-				for(Piece piece: simPiece) {
-					if(piece.color == WHITE_SIDE) {
-						piece.twoTileMove = false;
-					}
+			// Remove en passant option from white pieces
+			for(Piece piece: pieces) {
+				if(piece.color == WHITE_SIDE) {
+					piece.twoTileMove = false;
 				}
 			}
 		}
-		selectedPiece = null;
-	}
-	
-	private void castle() {
-	    // King-side castling: king moves to column 6, rook moves to column 5
-	    if(selectedPiece.col == 6) {
-	        castlePiece.col = 5;
-	    } 
-	    // Queen-side castling: king moves to column 2, rook moves to column 3
-	    else if(selectedPiece.col == 2) {
-	        castlePiece.col = 3;
-	    }
-	    //moves the rook to the new position
-	    castlePiece.movePosition();
-	    
-	    castlePiece = null;
-	}
-	
-	//handles the checking if a promotion is aviable
-	private boolean canPromote() {
 		
-		//checks if its a pawn
+		if (checkMate()) {
+	        String winner = (currentColor == WHITE_SIDE) ? "Black" : "White";
+	        System.out.println("CHECKMATE! " + winner + " wins!");
+	        gameOver = true; // You'll need to add this boolean field
+	        return; // Don't do further checks
+	    }
+		
+		 if (staleMate()) {
+		        System.out.println("STALEMATE! Game is a draw!");
+		        gameOver = true;
+		        return;
+		}
+		
+		// Check if the current player's king is in check
+		Piece king = getMyKing(currentColor);
+		if(isCheck(king)) {
+			String playerColor = (currentColor == WHITE_SIDE) ? "White" : "Black";
+			System.out.println(playerColor + " king is in check");
+		}
+	}
+	
+	// KEPT: Castle logic
+	private void castle() {
+		// King-side castling: king moves to column 6, rook moves to column 5
+		if(selectedPiece.col == 6) {
+			castlePiece.col = 5;
+		} 
+		// Queen-side castling: king moves to column 2, rook moves to column 3
+		else if(selectedPiece.col == 2) {
+			castlePiece.col = 3;
+		}
+		castlePiece.movePosition();
+		castlePiece = null;
+	}
+	
+	// KEPT: Check if promotion is available
+	private boolean canPromote() {
 		if(selectedPiece.type == Type.PAWN) {
-			//checks if the pawn is in row 0 to promote or black pawn in row 7 to promote
-			if(currentColor == WHITE_SIDE && selectedPiece.row == 0 || currentColor == BLACK_SIDE &&selectedPiece.row == 7) {
-				//clears the array of options
-				//and readds them
-				promotionPiece.clear();
-				promotionPiece.add(new Rook(currentColor,9,2));
-				promotionPiece.add(new Knight(currentColor,9,3));
-				promotionPiece.add(new Bishop(currentColor,9,4));
-				promotionPiece.add(new Queen(currentColor,9,5));
+			if(currentColor == WHITE_SIDE && selectedPiece.row == 0 || 
+			   currentColor == BLACK_SIDE && selectedPiece.row == 7) {
 				return true;
 			}
 		}
 		return false;
 	}
 	
-	//handles the actual promotio logic
-	private void promotion() {
+	// KEPT: King attack validation (simplified - no more sync needed)
+	public boolean kingMovesToAttackedSquare(Piece king, int targetColumn, int targetRow) {
+		// Store original position
+		int originalColumn = king.col;
+		int originalRow = king.row;
 		
-		if(controller.isPressed) {
-			synchronized(promotionPiece) {
-				for(Piece piece: promotionPiece) {
-					if(piece.col == controller.posX/ChessBoard.TILE_SIZE && piece.row == controller.posY/ChessBoard.TILE_SIZE) {
-						switch(piece.type) {
-					    case ROOK: simPiece.add(new Rook(currentColor, selectedPiece.col,selectedPiece.row)); break;
-					    case KNIGHT: simPiece.add(new Knight(currentColor, selectedPiece.col, selectedPiece.row)); break;
-					    case BISHOP: simPiece.add(new Bishop(currentColor, selectedPiece.col, selectedPiece.row)); break;
-					    case QUEEN: simPiece.add(new Queen(currentColor, selectedPiece.col, selectedPiece.row)); break;
-					    default: break;
-						}
-						
-						simPiece.remove(selectedPiece);
-						dupePieces(simPiece,arrPiece);
-						selectedPiece = null;
-						selectedPiece = null;
-						availableMoves.clear();
-						promote = false;
-						passTurn();
+		// Move king to target position temporarily
+		king.col = targetColumn;
+		king.row = targetRow;
+		
+		for(Piece piece: pieces) {
+			// Check if any enemy piece can attack the target position
+			if(piece != king && piece.color != king.color && piece.moveable(targetColumn, targetRow)) {
+				king.col = originalColumn;
+				king.row = originalRow;
+				return true;
+			}
+		}
+		
+		// Restore original position
+		king.col = originalColumn;
+		king.row = originalRow;
+		return false;
+	}
+
+	// KEPT: Check if move exposes king (simplified)
+	public boolean moveExposesKing(Piece selectedPiece, int targetColumn, int targetRow) {
+		if(selectedPiece.type == Type.KING) {
+			return kingMovesToAttackedSquare(selectedPiece, targetColumn, targetRow);
+		}
+		
+		Piece king = getMyKing(currentColor);
+		
+		// Store original position
+		int originalColumn = selectedPiece.col;
+		int originalRow = selectedPiece.row;
+		
+		// Store captured piece (if any)
+		Piece capturedPiece = getPieceAt(targetColumn, targetRow);
+		if (capturedPiece != null && capturedPiece.color == selectedPiece.color) {
+			capturedPiece = null; // Can't capture own piece
+		}
+		
+		// Simulate the move
+		selectedPiece.col = targetColumn;
+		selectedPiece.row = targetRow;
+		
+		// Remove captured piece temporarily
+		if(capturedPiece != null) {
+			pieces.remove(capturedPiece);
+		}
+		
+		// Check if king is in check after this move
+		boolean wouldBeInCheck = isCheck(king);
+		
+		// Restore the game state
+		selectedPiece.col = originalColumn;
+		selectedPiece.row = originalRow;
+		
+		// Restore captured piece
+		if(capturedPiece != null) {
+			pieces.add(capturedPiece);
+		}
+		
+		return wouldBeInCheck;
+	}
+	
+	// KEPT: Get current player's king
+	private Piece getMyKing(int currentColor) {
+		for(Piece piece : pieces) {
+			if(piece.type == Type.KING && piece.color == currentColor) {
+				return piece;
+			}
+		}
+		System.out.println("ERROR: No king found for color " + currentColor);
+		return null;
+	}
+	
+	// KEPT: Check if king is in check
+	private boolean isCheck(Piece king) {
+		if(king == null) {
+			return false;
+		}
+		
+		for(Piece piece: pieces) {
+			if(piece.color != king.color && piece.moveable(king.col, king.row)) {
+				return true;
+			}
+		}
+		return false;
+	}
+	
+	// IMPROVED: Calculate available moves (fixed the bug you mentioned)
+	private void calculateAvailableMoves() {
+		availableMoves.clear();
+		
+		if(selectedPiece == null) {
+			return;
+		}
+		
+		// Check all tiles on the board
+		for(int col = 0; col < 8; col++) {
+			for(int row = 0; row < 8; row++) {
+				// Check if the piece can move to this position
+				if(selectedPiece.moveable(col, row)) {
+					// Check if this move would expose our king
+					if(!moveExposesKing(selectedPiece, col, row)) {
+						availableMoves.add(new int[]{col, row});
 					}
 				}
 			}
 		}
-	}
-	
-	public boolean illegalMoveByKing(Piece king, int targetColumn, int targetRow) {
-	    
-	    if(king.type == Type.KING) {
-	        // Store original position
-	        int originalColumn = king.col;
-	        int originalRow = king.row;
-	        
-	        // STEP 1: Move king to target position temporarily
-	        king.col = targetColumn;
-	        king.row = targetRow;
-	        
-	        synchronized(simPiece) {
-	            for(Piece piece: simPiece) {
-	                // STEP 2: Check if any enemy piece can attack the target position
-	                if(piece != king && piece.color != king.color && piece.moveable(targetColumn, targetRow)) {
-	                    king.col = originalColumn;
-	                    king.row = originalRow;
-	                    return true; // This move would be illegal
-	                }
-	            }
-	        }
-	        
-	        // STEP 4: Restore original position
-	        king.col = originalColumn;
-	        king.row = originalRow;
-	    }
-	    return false;
-	}
-	
-	private void isLegalMove(Piece piece, int targetColumn, int targetRow ) {
-		int originalCol = piece.col;
-	    int originalRow = piece.row;
-	    Piece capturedPiece = null;
-	    
-	    
-	}
-	
-	private void update() {
 		
-		if(promote) {
-			promotion();
-		} else {
-			if(controller.isPressed) {
-		        if(selectedPiece == null) {
-		            
-		            //find the piece that the player wanted to select
-		            //via loop and checking if the mouse matches column and row
-		        	synchronized(simPiece) {
-		                for(Piece piece: simPiece) {
-		                    if(piece.color == currentColor && 
-		                       piece.col == controller.posX/ChessBoard.TILE_SIZE && 
-		                       piece.row == controller.posY/ChessBoard.TILE_SIZE) {
-		                        
-		                        selectedPiece = piece;
-		                        // Calculate available moves when piece is selected
-		                        calculateAvailableMoves();
-		                    }
-		                }
-		            }
-		        } else {
-		            simulate();
-		        }
-		    }
-		    
-		    if(!controller.isPressed) {
-		        if(selectedPiece != null) {
-		            if(validTile) {
-		                //update the list of piece when theres a capture
-		                if(selectedPiece.targetPiece != null) {
-		                    simPiece.remove(selectedPiece.targetPiece.getTargetIndex());
-		                }
-		                
-		                selectedPiece.movePosition();
-		                
-		                //call promotion
-		                
-		               
-		                
-		                // Handle castling - move the rook after moving the king
-		                if(castlePiece != null) {
-		                	castle();
-		                }
-		                
-		                // Update the permanent piece list AFTER castling is complete
-		                dupePieces(simPiece, arrPiece);
-		              
-		                
-		                if(canPromote()) {
-		                    promote = true;
-		                } else {
-		                    selectedPiece = null;
-		                    passTurn();
-		                    availableMoves.clear();
-		                }
-		            } else {
-		                dupePieces(arrPiece,simPiece);
-		                selectedPiece.revert();
-		                selectedPiece = null;
-		                // Clear available moves when move is invalid
-		                availableMoves.clear();
-		                castlePiece = null; // Reset if invalid move
-		            }
-		        }
-		    }
-		}
-	    
+		
 	}
 	
-	
-	private void simulate() {
-		
-		canMove = false;
-		validTile = false;
-		//reset the list of piece in every loop
-		//this is for the removed pieces during simulation
-		//centers the piece when selecting
-		selectedPiece.posX = controller.posX - ChessBoard.HALF_TILE_SIZE;
-		selectedPiece.posY = controller.posY - ChessBoard.HALF_TILE_SIZE;
-		//centers the actual hitbox of the piece
-		selectedPiece.col = selectedPiece.getColumn(selectedPiece.posX);
-		selectedPiece.row = selectedPiece.getRow(selectedPiece.posY);
-		
-		if(selectedPiece.moveable(selectedPiece.col, selectedPiece.row)) {
-			canMove = true;
+	private boolean checkMate() {
 			
-			if(selectedPiece.type == Type.KING) {
-	            if(!illegalMoveByKing(selectedPiece, selectedPiece.col, selectedPiece.row)) {
-	                validTile = true;
-	            }
-	        } else {
-	            validTile = true; 
-	        }
-			
-		}
+		Piece king = getMyKing(currentColor);
 		
-		
-	}
-	
-	// Calculate all available moves for the selected piece
-	private void calculateAvailableMoves() {
-	    synchronized(simPiece) {  // Add this
-	        availableMoves.clear();
-	        
-	        if(selectedPiece == null) {
-	            return;
-	        }
-	        
-	        // Check all tiles on the board
-	        for(int col = 0; col < 8; col++) {
-	            for(int row = 0; row < 8; row++) {
-	                // Temporarily set piece position for testing
-	                int originalCol = selectedPiece.col;
-	                int originalRow = selectedPiece.row;
-	                
-	                selectedPiece.col = col;
-	                selectedPiece.row = row;
-	                
-	                // Check if the piece can move to this position
-	                if(selectedPiece.moveable(col, row)) {
-	                	boolean isLegalMove = true;
-	                	 if(selectedPiece.type == Type.KING) {
-	                         // For king moves, use the existing illegalMove method
-	                         if(illegalMoveByKing(selectedPiece, col, row)) {
-	                             isLegalMove = false;
-	                         }
-	                     }
-	                	  if(isLegalMove) {
-	                          availableMoves.add(new int[]{col, row});
-	                      }
-	                }
-	                
-	                // Restore original position
-	                selectedPiece.col = originalCol;
-	                selectedPiece.row = originalRow;
-	            }
-	        }
+		if (!isCheck(king)) {
+	        return false;
 	    }
+		
+		for(Piece piece: pieces) {
+			if(piece.color == currentColor) {
+				for(int col = 0; col < 8; col++) {
+					for(int row = 0; row < 8; row++) {
+						// Check if the piece can move to this position
+						if(piece.moveable(col, row)) {
+							// Check if this move would expose our king
+							if(!moveExposesKing(piece, col, row)) {
+								return false;
+							}
+						}
+					}
+				}
+			}
+		}
+		return true;
 	}
 	
-	// Draw available move indicators
+	private boolean staleMate() {
+		
+		Piece king = getMyKing(currentColor);
+		
+		if (isCheck(king)) {
+	        return false;
+	    }
+		
+		for(Piece piece: pieces) {
+			if(piece.color == currentColor) {
+				for(int col = 0; col < 8; col++) {
+					for(int row = 0; row < 8; row++) {
+						// Check if the piece can move to this position
+						if(piece.moveable(col, row)) {
+							// Check if this move would expose our king
+							if(!moveExposesKing(piece, col, row)) {
+								return false;
+							}
+						}
+					}
+				}
+			}
+		}
+		return true;
+	}
+	
+	// KEPT: Draw available move indicators
 	private void drawAvailableMoves(Graphics2D g2) {
 		if(selectedPiece == null || availableMoves.isEmpty()) {
 			return;
@@ -355,35 +489,27 @@ public class ChessPanel extends JPanel implements Runnable{
 			int x = col * ChessBoard.TILE_SIZE;
 			int y = row * ChessBoard.TILE_SIZE;
 			
-			// Check if there's an enemy piece at this position (for capture moves)
-			// Create a copy to avoid ConcurrentModificationException
+			// Check if there's an enemy piece at this position
 			boolean isCapture = false;
-			
-			synchronized(simPiece) {
-				for(Piece piece : new ArrayList<Piece>(simPiece)) {
-					if(piece.col == col && piece.row == row && piece.color != selectedPiece.color) {
-						isCapture = true;
-						break;
-					}
-				}
+			Piece pieceAtTarget = getPieceAt(col, row);
+			if (pieceAtTarget != null && pieceAtTarget.color != selectedPiece.color) {
+				isCapture = true;
 			}
-			
 			
 			if(isCapture) {
 				// Draw red border for capture moves
 				g2.setColor(Color.RED);
 				g2.drawRect(x + 5, y + 5, ChessBoard.TILE_SIZE - 10, ChessBoard.TILE_SIZE - 10);
-				g2.setColor(new Color(255, 0, 0, 100)); // Transparent red
+				g2.setColor(new Color(255, 0, 0, 100));
 				g2.fillRect(x + 5, y + 5, ChessBoard.TILE_SIZE - 10, ChessBoard.TILE_SIZE - 10);
 			} else {
 				// Draw green circle for regular moves
-				g2.setColor(new Color(0, 255, 0, 150)); // Transparent green
+				g2.setColor(new Color(0, 255, 0, 150));
 				int circleSize = ChessBoard.TILE_SIZE / 3;
 				int centerX = x + ChessBoard.TILE_SIZE / 2 - circleSize / 2;
 				int centerY = y + ChessBoard.TILE_SIZE / 2 - circleSize / 2;
 				g2.fillOval(centerX, centerY, circleSize, circleSize);
-
-				// Add border
+				
 				g2.setColor(Color.GREEN);
 				g2.drawOval(centerX, centerY, circleSize, circleSize);
 			}
@@ -393,112 +519,84 @@ public class ChessPanel extends JPanel implements Runnable{
 		g2.setComposite(originalComposite);
 	}
 	
-	//create pieces
-	//add an inverse for picking color later on
+	// KEPT: Create pieces
 	public void createPieces() {
-	    // White pieces
-	    for (int col = 0; col < 8; col++) {
-	        arrPiece.add(new Pawn(WHITE_SIDE, col, 6)); // row 6 = pawns
-	    }
-	    arrPiece.add(new Rook(WHITE_SIDE, 0, 7));
-	    arrPiece.add(new Knight(WHITE_SIDE, 1, 7));
-	    arrPiece.add(new Bishop(WHITE_SIDE, 2, 7));
-	    arrPiece.add(new Queen(WHITE_SIDE, 3, 7));
-	    arrPiece.add(new King(WHITE_SIDE, 4, 7));
-	    arrPiece.add(new Bishop(WHITE_SIDE, 5, 7));
-	    arrPiece.add(new Knight(WHITE_SIDE, 6, 7));
-	    arrPiece.add(new Rook(WHITE_SIDE, 7, 7));
-	    // Black pieces
-	    for (int col = 0; col < 8; col++) {
-	        arrPiece.add(new Pawn(BLACK_SIDE, col, 1)); // row 1 = pawns
-	    }
-	    arrPiece.add(new Rook(BLACK_SIDE, 0, 0));
-	    arrPiece.add(new Knight(BLACK_SIDE, 1, 0));
-	    arrPiece.add(new Bishop(BLACK_SIDE, 2, 0));
-	    arrPiece.add(new Queen(BLACK_SIDE, 3, 0));
-	    arrPiece.add(new King(BLACK_SIDE, 4, 0));
-	    arrPiece.add(new Bishop(BLACK_SIDE, 5, 0));
-	    arrPiece.add(new Knight(BLACK_SIDE, 6, 0));
-	    arrPiece.add(new Rook(BLACK_SIDE, 7, 0));
-	}	
+		// White pieces
+		for (int col = 0; col < 8; col++) {
+			pieces.add(new Pawn(WHITE_SIDE, col, 6));
+		}
+		pieces.add(new Rook(WHITE_SIDE, 0, 7));
+		pieces.add(new Knight(WHITE_SIDE, 1, 7));
+		pieces.add(new Bishop(WHITE_SIDE, 2, 7));
+		pieces.add(new Queen(WHITE_SIDE, 3, 7));
+		pieces.add(new King(WHITE_SIDE, 4, 7));
+		pieces.add(new Bishop(WHITE_SIDE, 5, 7));
+		pieces.add(new Knight(WHITE_SIDE, 6, 7));
+		pieces.add(new Rook(WHITE_SIDE, 7, 7));
+		
+		// Black pieces
+		for (int col = 0; col < 8; col++) {
+			pieces.add(new Pawn(BLACK_SIDE, col, 1));
+		}
+		pieces.add(new Rook(BLACK_SIDE, 0, 0));
+		pieces.add(new Knight(BLACK_SIDE, 1, 0));
+		pieces.add(new Bishop(BLACK_SIDE, 2, 0));
+		pieces.add(new Queen(BLACK_SIDE, 3, 0));
+		pieces.add(new King(BLACK_SIDE, 4, 0));
+		pieces.add(new Bishop(BLACK_SIDE, 5, 0));
+		pieces.add(new Knight(BLACK_SIDE, 6, 0));
+		pieces.add(new Rook(BLACK_SIDE, 7, 0));
+	}
 	
-	private void dupePieces(ArrayList<Piece> source,ArrayList<Piece> target) {
-	    synchronized(source) {  // Synchronize on the source list
-	        synchronized(target) {  // Synchronize on the target list
-	            target.clear();
-	            for(int i = 0; i < source.size(); i++) {
-	                target.add(source.get(i));
-	            }
+	// KEPT: Paint component (simplified - no more sync issues)
+	public void paintComponent(Graphics g) {
+	    super.paintComponent(g);
+
+	    Graphics2D g2 = (Graphics2D)g;
+
+	    chessBoard.draw(g2);
+
+	    // Draw available moves before drawing pieces
+	    drawAvailableMoves(g2);
+
+	    // Draw all pieces (much simpler now)
+	    for(Piece piece: pieces) {
+	        piece.draw(g2);
+	    }
+
+	    // Status messages
+	    g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+	    g2.setFont(new Font("Book Antiqua", Font.PLAIN, 40));
+	    g2.setColor(Color.white);
+
+	    if(promote) {
+	        g2.drawString("Promote to:", 840, 150);
+	        for(Piece piece: promotionPiece) {
+	            g2.drawImage(piece.image, piece.getXpos(piece.col), piece.getYpos(piece.row),
+	                    ChessBoard.TILE_SIZE, ChessBoard.TILE_SIZE, null);
+	        }
+	    } else if(gameOver) { // ADD THIS - Check for game over first
+	        // Make the text bigger and more prominent for game over
+	        g2.setFont(new Font("Book Antiqua", Font.BOLD, 50));
+	        g2.setColor(Color.RED);
+	        
+	        if(checkMate()) {
+	        	 g2.setColor(Color.WHITE);
+	            // Determine winner (opposite of current player since they can't move)
+	            String winner = (currentColor == WHITE_SIDE) ? "Black Wins!" : "White Wins!";
+	            g2.drawString(winner, 820, 350);
+	            g2.drawString("Checkmate!", 820, 420);
+	        } else if(staleMate()) { // You'll need to create this method
+	            g2.drawString("Stalemate!", 840, 350);
+	            g2.drawString("Draw!", 840, 420);
+	        }
+	    } else {
+	        // Normal turn messages
+	        if (currentColor == WHITE_SIDE) {
+	            g2.drawString("White's turn", 840, 550);
+	        } else {
+	            g2.drawString("Black's turn", 840, 250);
 	        }
 	    }
-	}
-	
-	//used to draw
-	public void paintComponent(Graphics g) {
-		super.paintComponent(g);
-		
-		Graphics2D g2 = (Graphics2D)g;
-		
-		chessBoard.draw(g2);
-		
-		// Draw available moves before drawing pieces
-		drawAvailableMoves(g2);
-		
-		// Use synchronized block to prevent ConcurrentModificationException
-		synchronized(simPiece) {
-			for(Piece piece: simPiece) {
-				piece.draw(g2);
-			}
-		}
-		
-		//status messages
-		g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
-		g2.setFont(new Font("Book Antiqua", Font.PLAIN,40));
-		g2.setColor(Color.white);
-		
-		
-		if(promote) {
-			g2.drawString("Promote to:", 840, 150);
-			synchronized(promotionPiece){
-				for(Piece piece: promotionPiece) {
-					g2.drawImage(piece.image, piece.getXpos(piece.col), piece.getYpos(piece.row),
-							ChessBoard.TILE_SIZE, ChessBoard.TILE_SIZE, null);
-			}
-			
-				
-			}
-		}else {
-			if (currentColor == WHITE_SIDE) {
-			    g2.drawString("White's turn", 840, 550);
-			} else {
-			    g2.drawString("Black's turn", 840, 250);
-			}
-		}
-	}
-
-	
-	//has the gameclock
-	@Override
-	public void run() {
-		// TODO Auto-generated method stub
-		double updateInterval = 1000000000/framePerSecond;
-		double difference = 0;
-		long lastUpdate = System.nanoTime();
-		long currentUpdate;
-		
-		
-		while(chessThread != null) {
-			
-			currentUpdate = System.nanoTime();
-			difference = (currentUpdate - lastUpdate)/updateInterval;
-			
-			if(difference >= 1) {
-				update();
-				repaint();
-				difference--;
-			}
-		}
-		
-		
 	}
 }
