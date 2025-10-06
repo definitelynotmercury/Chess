@@ -6,6 +6,7 @@ import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
+import java.awt.Rectangle;
 import java.awt.RenderingHints;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
@@ -36,6 +37,10 @@ public class ChessPanel extends JPanel {
 	//BOOLEANS
 	boolean promote;
 	boolean gameOver;
+	boolean vsAI = false;
+	public static boolean playerIsWhite = true;
+	boolean showColorSelection = false;
+	
 	
 	//pieces - simplified to single list (no more arrPiece/simPiece confusion)
 	public static ArrayList<Piece> pieces = new ArrayList<Piece>();
@@ -46,12 +51,27 @@ public class ChessPanel extends JPanel {
 	// Available moves for selected piece
 	ArrayList<int[]> availableMoves = new ArrayList<int[]>();
 	
+	//GameState 
+	enum GameState { SETUP, PLAYING, GAME_OVER }
+	GameState gameState = GameState.SETUP;
+	
+	//click rectangles
+	Rectangle passPlayButton = new Rectangle(850, 200, 200, 50);
+	Rectangle vsAIButton = new Rectangle(850, 270, 200, 50);
+	Rectangle whiteButton = new Rectangle(850, 360, 200, 50);
+	Rectangle blackButton = new Rectangle(850, 430, 200, 50);
+	Rectangle startButton = new Rectangle(850, 500, 200, 50);
+	
+	//Ai
+	private ChessAI ai;
+	private int aiColor;
+	private boolean waitingForAI = false;
+	
 	//sets the panel size
 	public ChessPanel() {
 		setPreferredSize(new Dimension(PANELWIDTH,PANELHEIGHT));
 		setBackground(Color.lightGray);
 		setupMouseHandlers();
-		createPieces();
 	}
 	
 	// NEW: Event-driven mouse handling
@@ -71,7 +91,9 @@ public class ChessPanel extends JPanel {
 		int clickedCol = mouseX / ChessBoard.TILE_SIZE;
 		int clickedRow = mouseY / ChessBoard.TILE_SIZE;
 		
-		if (promote) {
+		if (gameState == GameState.SETUP) {
+			handleSetup(mouseX, mouseY);
+	    } else if (promote) {
 			// During promotion, allow clicks in the promotion area (column 9)
 			handlePromotion(clickedCol, clickedRow);
 		} else {
@@ -85,8 +107,153 @@ public class ChessPanel extends JPanel {
 		repaint(); // Only repaint when something actually changes
 	}
 	
+	private void handleSetup(int mouseX, int mouseY) {
+		
+		// Pass & Play button
+	    if (passPlayButton.contains(mouseX, mouseY)) {
+	        vsAI = false;
+	        showColorSelection = false;
+	        return;
+	    }
+	    
+	    // vs AI button
+	    if (vsAIButton.contains(mouseX, mouseY)) {
+	        vsAI = true;
+	        showColorSelection = true;
+	        playerIsWhite = true; // Default to white
+	        return;
+	    }
+	    
+	    // Color selection buttons (only if vs AI selected)
+	    if (showColorSelection) {
+	        if (whiteButton.contains(mouseX, mouseY)) {
+	            playerIsWhite = true;
+	            return;
+	        }
+	        
+	        if (blackButton.contains(mouseX, mouseY)) {
+	            playerIsWhite = false;
+	            return;
+	        }
+	    }
+	    
+	    // Start game button
+	    if (startButton.contains(mouseX, mouseY)) {
+	        if (vsAI && !showColorSelection) return; // Need color selection for AI
+	        
+	        // Start the game
+	        gameState = GameState.PLAYING;
+	        setupGame();
+	        return;
+	    }
+		
+	}
+	
+	private void drawSetupScreen(Graphics2D g2) {
+	    // Set up text rendering (like your existing status messages)
+	    g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+	    
+	    // Title
+	    g2.setFont(new Font("Book Antiqua", Font.BOLD, 40));
+	    g2.setColor(Color.white);
+	    g2.drawString("Chess Game ", 840, 150);
+	    
+	    // Game mode buttons
+	    g2.setFont(new Font("Book Antiqua", Font.PLAIN, 24));
+	    
+	    // Pass & Play button
+	    g2.setColor(vsAI ? Color.lightGray : Color.green);
+	    g2.fillRect(passPlayButton.x, passPlayButton.y, passPlayButton.width, passPlayButton.height);
+	    g2.setColor(Color.black);
+	    g2.drawRect(passPlayButton.x, passPlayButton.y, passPlayButton.width, passPlayButton.height);
+	    g2.drawString("Pass & Play", passPlayButton.x + 20, passPlayButton.y + 30);
+	    
+	    // vs AI button
+	    g2.setColor(vsAI ? Color.green : Color.lightGray);
+	    g2.fillRect(vsAIButton.x, vsAIButton.y, vsAIButton.width, vsAIButton.height);
+	    g2.setColor(Color.black);
+	    g2.drawRect(vsAIButton.x, vsAIButton.y, vsAIButton.width, vsAIButton.height);
+	    g2.drawString("vs Computer", vsAIButton.x + 20, vsAIButton.y + 30);
+	    
+	    // Color selection (only if vs AI)
+	    if (showColorSelection) {
+	        g2.setColor(Color.white);
+	        g2.drawString("Choose your color:", 850, 350);
+	        
+	        // White button
+	        g2.setColor(playerIsWhite ? Color.green : Color.lightGray);
+	        g2.fillRect(whiteButton.x, whiteButton.y, whiteButton.width, whiteButton.height);
+	        g2.setColor(Color.black);
+	        g2.drawRect(whiteButton.x, whiteButton.y , whiteButton.width, whiteButton.height);
+	        g2.drawString("Play White", whiteButton.x + 20, whiteButton.y + 30);
+	        
+	        // Black button
+	        g2.setColor(!playerIsWhite ? Color.green : Color.lightGray);
+	        g2.fillRect(blackButton.x, blackButton.y, blackButton.width, blackButton.height);
+	        g2.setColor(Color.black);
+	        g2.drawRect(blackButton.x, blackButton.y, blackButton.width, blackButton.height);
+	        g2.drawString("Play Black", blackButton.x + 20, blackButton.y + 30);
+	    }
+	    
+	    // Start button
+	    g2.setColor(Color.yellow);
+	    g2.fillRect(startButton.x, startButton.y, startButton.width, startButton.height);
+	    g2.setColor(Color.black);
+	    g2.drawRect(startButton.x, startButton.y, startButton.width, startButton.height);
+	    g2.drawString("Start Game", startButton.x + 20, startButton.y + 30);
+	}
+	
+	private void setupGame() {
+	    createPieces();
+	    gameState = GameState.PLAYING;
+	    
+	    if(vsAI) {
+	        // Set AI color (opposite of player)
+	        aiColor = playerIsWhite ? BLACK_SIDE : WHITE_SIDE;
+	        ai = new ChessAI(aiColor);
+	        
+	        // If AI goes first (player chose black)
+	        if(aiColor == WHITE_SIDE) {
+	            aiTurnToMove();
+	        }
+	    }
+	}
+	
+	private void aiTurnToMove() {
+		if(!vsAI || currentColor != aiColor) {
+	        return;
+	    }
+		
+		waitingForAI = true;
+		
+		Move aiMove = ai.selectValidMove(pieces, this);
+		
+		if(aiMove != null) {
+            // Execute the AI's chosen move
+            executeAIMove(aiMove);
+            waitingForAI = false;
+            repaint();
+        }
+		
+		
+	}
+	
+	private void executeAIMove(Move move) {
+		selectedPiece = move.piece;
+		executeMove(move.toCol, move.toRow);
+	}
+	
 	// NEW: Handle regular game moves
 	private void handleRegularMove(int clickedCol, int clickedRow) {
+		if (gameOver || waitingForAI) {
+	        return; // Don't allow moves if game is over or AI is thinking
+	    }
+	    
+	    // Prevent player from moving AI pieces
+	    if(vsAI && currentColor == aiColor) {
+	        return;
+	    }
+	    
 		if (selectedPiece == null) {
 			// Try to select a piece
 			selectPiece(clickedCol, clickedRow);
@@ -188,6 +355,9 @@ public class ChessPanel extends JPanel {
 	private void finishMove() {
 		deselectPiece();
 		passTurn();
+		if(vsAI && currentColor == aiColor && !gameOver) {
+	        aiTurnToMove();
+	    }
 	}
 	
 	// NEW: Setup promotion options
@@ -426,20 +596,18 @@ public class ChessPanel extends JPanel {
 	        return false;
 	    }
 		
-		for(Piece piece: pieces) {
-			if(piece.color == currentColor) {
-				for(int col = 0; col < 8; col++) {
-					for(int row = 0; row < 8; row++) {
-						// Check if the piece can move to this position
-						if(piece.moveable(col, row)) {
-							// Check if this move would expose our king
-							if(!moveExposesKing(piece, col, row)) {
-								return false;
-							}
-						}
-					}
-				}
-			}
+		for(Piece piece: new ArrayList<>(pieces)) {
+		    if(piece.color == currentColor) {
+		        for(int col = 0; col < 8; col++) {
+		            for(int row = 0; row < 8; row++) {
+		                if(piece.moveable(col, row)) {
+		                    if(!moveExposesKing(piece, col, row)) {
+		                        return false;
+		                    }
+		                }
+		            }
+		        }
+		    }
 		}
 		return true;
 	}
@@ -521,40 +689,78 @@ public class ChessPanel extends JPanel {
 	
 	// KEPT: Create pieces
 	public void createPieces() {
-		// White pieces
-		for (int col = 0; col < 8; col++) {
-			pieces.add(new Pawn(WHITE_SIDE, col, 6));
-		}
-		pieces.add(new Rook(WHITE_SIDE, 0, 7));
-		pieces.add(new Knight(WHITE_SIDE, 1, 7));
-		pieces.add(new Bishop(WHITE_SIDE, 2, 7));
-		pieces.add(new Queen(WHITE_SIDE, 3, 7));
-		pieces.add(new King(WHITE_SIDE, 4, 7));
-		pieces.add(new Bishop(WHITE_SIDE, 5, 7));
-		pieces.add(new Knight(WHITE_SIDE, 6, 7));
-		pieces.add(new Rook(WHITE_SIDE, 7, 7));
 		
-		// Black pieces
-		for (int col = 0; col < 8; col++) {
-			pieces.add(new Pawn(BLACK_SIDE, col, 1));
+		if(playerIsWhite) {
+			// White pieces
+			for (int col = 0; col < 8; col++) {
+				pieces.add(new Pawn(WHITE_SIDE, col, 6));
+			}
+				pieces.add(new Rook(WHITE_SIDE, 0, 7));
+				pieces.add(new Knight(WHITE_SIDE, 1, 7));
+				pieces.add(new Bishop(WHITE_SIDE, 2, 7));
+				pieces.add(new Queen(WHITE_SIDE, 3, 7));
+				pieces.add(new King(WHITE_SIDE, 4, 7));
+				pieces.add(new Bishop(WHITE_SIDE, 5, 7));
+				pieces.add(new Knight(WHITE_SIDE, 6, 7));
+				pieces.add(new Rook(WHITE_SIDE, 7, 7));
+				
+			// Black pieces
+			for (int col = 0; col < 8; col++) {
+				pieces.add(new Pawn(BLACK_SIDE, col, 1));
+			}
+				pieces.add(new Rook(BLACK_SIDE, 0, 0));
+				pieces.add(new Knight(BLACK_SIDE, 1, 0));
+				pieces.add(new Bishop(BLACK_SIDE, 2, 0));
+				pieces.add(new Queen(BLACK_SIDE, 3, 0));
+				pieces.add(new King(BLACK_SIDE, 4, 0));
+				pieces.add(new Bishop(BLACK_SIDE, 5, 0));
+				pieces.add(new Knight(BLACK_SIDE, 6, 0));
+				pieces.add(new Rook(BLACK_SIDE, 7, 0));
+			}else {
+				// Black pieces (at bottom for Black POV)
+				for (int col = 0; col < 8; col++) {
+				    pieces.add(new Pawn(BLACK_SIDE, col, 6));
+				}
+				pieces.add(new Rook(BLACK_SIDE, 0, 7));
+				pieces.add(new Knight(BLACK_SIDE, 1, 7));
+				pieces.add(new Bishop(BLACK_SIDE, 2, 7));
+				pieces.add(new Queen(BLACK_SIDE, 4, 7));
+				pieces.add(new King(BLACK_SIDE, 3, 7));
+				pieces.add(new Bishop(BLACK_SIDE, 5, 7));
+				pieces.add(new Knight(BLACK_SIDE, 6, 7));
+				pieces.add(new Rook(BLACK_SIDE, 7, 7));
+
+				// White pieces (at top for Black POV)
+				for (int col = 0; col < 8; col++) {
+				    pieces.add(new Pawn(WHITE_SIDE, col, 1));
+				}
+				pieces.add(new Rook(WHITE_SIDE, 0, 0));
+				pieces.add(new Knight(WHITE_SIDE, 1, 0));
+				pieces.add(new Bishop(WHITE_SIDE, 2, 0));
+				pieces.add(new Queen(WHITE_SIDE, 4, 0));
+				pieces.add(new King(WHITE_SIDE, 3, 0));
+				pieces.add(new Bishop(WHITE_SIDE, 5, 0));
+				pieces.add(new Knight(WHITE_SIDE, 6, 0));
+				pieces.add(new Rook(WHITE_SIDE, 7, 0));
+
+			}
 		}
-		pieces.add(new Rook(BLACK_SIDE, 0, 0));
-		pieces.add(new Knight(BLACK_SIDE, 1, 0));
-		pieces.add(new Bishop(BLACK_SIDE, 2, 0));
-		pieces.add(new Queen(BLACK_SIDE, 3, 0));
-		pieces.add(new King(BLACK_SIDE, 4, 0));
-		pieces.add(new Bishop(BLACK_SIDE, 5, 0));
-		pieces.add(new Knight(BLACK_SIDE, 6, 0));
-		pieces.add(new Rook(BLACK_SIDE, 7, 0));
-	}
+		
 	
 	// KEPT: Paint component (simplified - no more sync issues)
 	public void paintComponent(Graphics g) {
 	    super.paintComponent(g);
 
 	    Graphics2D g2 = (Graphics2D)g;
+	    
+	    
 
 	    chessBoard.draw(g2);
+	    
+	    if (gameState == GameState.SETUP) {
+	        drawSetupScreen(g2);
+	        return;
+	    }
 
 	    // Draw available moves before drawing pieces
 	    drawAvailableMoves(g2);

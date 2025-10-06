@@ -19,11 +19,21 @@ public class Pawn extends Piece {
 		
 		int moveDirection;
 		
-		if(color == ChessPanel.WHITE_SIDE) {
-			moveDirection = -1;
-		} else {
-			moveDirection = 1;
+		if(ChessPanel.playerIsWhite) {
+			if(color == ChessPanel.WHITE_SIDE) {
+				moveDirection = -1;
+			} else {
+				moveDirection = 1;
+			}
+		}else {
+			if(color == ChessPanel.WHITE_SIDE) {
+				moveDirection = 1;
+			} else {
+				moveDirection = -1;
+			}
 		}
+		
+		
 		
 		targetPiece = getTargetPiece(targetColumn, targetRow);
 		
