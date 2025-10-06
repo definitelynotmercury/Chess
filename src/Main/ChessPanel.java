@@ -464,10 +464,18 @@ public class ChessPanel extends JPanel {
 	// KEPT: Check if promotion is available
 	private boolean canPromote() {
 		if(selectedPiece.type == Type.PAWN) {
-			if(currentColor == WHITE_SIDE && selectedPiece.row == 0 || 
-			   currentColor == BLACK_SIDE && selectedPiece.row == 7) {
-				return true;
+			if(playerIsWhite) {
+				if(currentColor == WHITE_SIDE && selectedPiece.row == 0 || 
+						   currentColor == BLACK_SIDE && selectedPiece.row == 7) {
+							return true;
+						}
+			}else {
+				if(currentColor == BLACK_SIDE && selectedPiece.row == 0 || 
+						   currentColor == WHITE_SIDE && selectedPiece.row == 7) {
+							return true;
+						}
 			}
+			
 		}
 		return false;
 	}
