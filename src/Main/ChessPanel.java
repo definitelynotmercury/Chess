@@ -226,7 +226,7 @@ public class ChessPanel extends JPanel {
 		
 		waitingForAI = true;
 		
-		Move aiMove = ai.selectValidMove(pieces, this);
+		Move aiMove = ai.selectBestMove(pieces, this);
 		
 		if(aiMove != null) {
             // Execute the AI's chosen move
@@ -335,7 +335,7 @@ public class ChessPanel extends JPanel {
 	}
 	
 	// NEW: Get piece at specific location
-	private Piece getPieceAt(int col, int row) {
+	public static Piece getPieceAt(int col, int row) {
 		for (Piece piece : pieces) {
 			if (piece.col == col && piece.row == row) {
 				return piece;
@@ -490,19 +490,37 @@ public class ChessPanel extends JPanel {
 		king.col = targetColumn;
 		king.row = targetRow;
 		
+		// Check if there's a piece at target (we'll need to remove it temporarily)
+	    Piece pieceAtTarget = null;
+		
 		for(Piece piece: pieces) {
 			// Check if any enemy piece can attack the target position
-			if(piece != king && piece.color != king.color && piece.moveable(targetColumn, targetRow)) {
-				king.col = originalColumn;
-				king.row = originalRow;
-				return true;
+			if(piece != king && piece.col == targetColumn && piece.row == targetRow) {
+				pieceAtTarget = piece;
+				break;
 			}
 		}
+		
+		if(pieceAtTarget != null) {
+	        pieces.remove(pieceAtTarget);
+	    }
+		
+		boolean isAttacked = false;
+	    for(Piece piece: pieces) {
+	        if(piece != king && piece.color != king.color && piece.moveable(targetColumn, targetRow)) {
+	            isAttacked = true;
+	            break;
+	        }
+	    }
+	    
+	    if(pieceAtTarget != null) {
+	        pieces.add(pieceAtTarget);
+	    }
 		
 		// Restore original position
 		king.col = originalColumn;
 		king.row = originalRow;
-		return false;
+		return isAttacked;
 	}
 
 	// KEPT: Check if move exposes king (simplified)
@@ -548,7 +566,7 @@ public class ChessPanel extends JPanel {
 	}
 	
 	// KEPT: Get current player's king
-	private Piece getMyKing(int currentColor) {
+	public Piece getMyKing(int currentColor) {
 		for(Piece piece : pieces) {
 			if(piece.type == Type.KING && piece.color == currentColor) {
 				return piece;
@@ -558,8 +576,18 @@ public class ChessPanel extends JPanel {
 		return null;
 	}
 	
+	public Piece enemyMyKing(int currentColor) {
+		for(Piece piece : pieces) {
+			if(piece.type == Type.KING && piece.color != currentColor) {
+				return piece;
+			}
+		}
+		System.out.println("ERROR: No king found for color " + currentColor);
+		return null;
+	}
+	
 	// KEPT: Check if king is in check
-	private boolean isCheck(Piece king) {
+	public boolean isCheck(Piece king) {
 		if(king == null) {
 			return false;
 		}
