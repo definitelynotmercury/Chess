@@ -99,7 +99,6 @@ public class ChessAI {
 	
 	private int scoreForSafety(Move move, ChessPanel panel) {
 		
-		ArrayList<Piece>dupedPieces = panel.pieces;
 		int destCol = move.toCol;
 	    int destRow = move.toRow;
 	    
@@ -114,12 +113,12 @@ public class ChessAI {
 	    Piece capturedPiece = null;
 	    if(move.capturedPiece!=null) {
 	    	capturedPiece = move.capturedPiece;
-	    	ChessPanel.pieces.remove(capturedPiece);
+	    	panel.pieces.remove(capturedPiece);
 	    }
 	    
 	    boolean canBeCaptured = false;
 	    
-	    for(Piece piece:dupedPieces) {
+	    for(Piece piece:panel.pieces) {
 	    	if (piece.moveable(destCol, destRow)&&piece.color!=aiColor) {
 		        // Danger! We might lose this piece
 	    		canBeCaptured = true;
@@ -130,7 +129,7 @@ public class ChessAI {
 	    move.piece.col = originalColumn;
 	    move.piece.row = originalRow;
 	    if (capturedPiece != null) {
-	    	ChessPanel.pieces.add(capturedPiece);
+	    	panel.pieces.add(capturedPiece);
 	    }
 	    
 	    if (canBeCaptured) {
@@ -186,7 +185,7 @@ public class ChessAI {
 	    Piece capturedPiece = null;
 	    if(move.capturedPiece!=null) {
 	    	capturedPiece = move.capturedPiece;
-	    	ChessPanel.pieces.remove(capturedPiece);
+	    	panel.pieces.remove(capturedPiece);
 	    }
 	    // Is the enemy king now in check?
 	    Piece enemyKing = panel.enemyMyKing(move.piece.color);
@@ -196,7 +195,7 @@ public class ChessAI {
 	    move.piece.col = originalColumn;
 	    move.piece.row = originalRow;
 	    if (capturedPiece != null) {
-	    	ChessPanel.pieces.add(capturedPiece);
+	    	panel.pieces.add(capturedPiece);
 	    }
 	    
 	    if (givesCheck) {
